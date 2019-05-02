@@ -69,6 +69,10 @@ namespace nd
     template<typename ValueType, typename... Args> auto unique_array(Args... args);
     template<std::size_t Rank> auto index_array(shape_t<Rank> shape);
     template<typename... Args> auto index_array(Args... args);
+
+    template<typename ValueType=int, typename... Args> auto zeros(Args... args);
+    template<typename ValueType=int, typename... Args> auto ones(Args... args);
+
     template<typename... ArrayTypes> auto zip_arrays(ArrayTypes&&... arrays);
 
 
@@ -1251,6 +1255,21 @@ template<typename... Args>
 auto nd::index_array(Args... args)
 {
     return index_array(make_shape(args...));
+}
+
+
+
+
+template<typename ValueType, typename... Args>
+auto nd::zeros(Args... args)
+{
+    return make_array(nd::make_uniform_provider(ValueType(0), args...));
+}
+
+template<typename ValueType, typename... Args>
+auto nd::ones(Args... args)
+{
+    return make_array(nd::make_uniform_provider(ValueType(1), args...));
 }
 
 

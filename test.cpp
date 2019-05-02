@@ -246,6 +246,16 @@ TEST_CASE("array can be constructed with an index provider", "[array] [index_pro
     REQUIRE(A(5) == nd::make_index(5));
 }
 
+TEST_CASE("ones, zeros array factories work as expected", "[ones] [zeros]")
+{
+    auto A = nd::ones(10, 20);
+    auto B = nd::zeros<double>(10, 20);
+    static_assert(std::is_same<decltype(A)::value_type, int>::value);
+    static_assert(std::is_same<decltype(B)::value_type, double>::value);
+    REQUIRE(A(5, 5) == 1);
+    REQUIRE(B(5, 5) == 0.0);
+}
+
 TEST_CASE("uniform provider can be constructed", "[uniform_provider]")
 {
     auto p = nd::make_uniform_provider(1.0, 10, 20, 40);
