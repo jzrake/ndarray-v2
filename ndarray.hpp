@@ -72,6 +72,7 @@ namespace nd
     template<typename... ArrayTypes> auto zip_arrays(ArrayTypes&&... arrays);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
+    template<typename ValueType, std::size_t Rank> auto promote(ValueType&&, nd::shape_t<Rank>);
 
 
     // array operator factory functions
@@ -747,49 +748,6 @@ public:
 
 
 //=============================================================================
-template<std::size_t Rank, typename Provider>
-class nd::array_t
-{
-public:
-
-    using provider_type = Provider;
-    using value_type = typename Provider::value_type;
-    static constexpr std::size_t rank = Rank;
-
-    //=========================================================================
-    array_t(Provider&& provider) : provider(std::move(provider)) {}
-
-    // indexing functions
-    //=========================================================================
-    template<typename... Args> decltype(auto) operator()(Args... args) const { return provider(make_index(args...)); }
-    template<typename... Args> decltype(auto) operator()(Args... args)       { return provider(make_index(args...)); }
-    decltype(auto) operator()(const index_t<Rank>& index) const { return provider(index); }
-    decltype(auto) operator()(const index_t<Rank>& index)       { return provider(index); }
-
-    // query functions and operator support
-    //=========================================================================
-    auto shape() const { return provider.shape(); }
-    auto size() const { return provider.size(); }
-    constexpr std::size_t get_rank() { return Rank; }
-    const Provider& get_provider() const { return provider; }
-    auto get_accessor() { return make_access_pattern(provider.shape()); }
-    template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
-    template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
-
-    // methods converting this to a memory-backed array
-    //=========================================================================
-    auto unique() const { return make_array(evaluate_as_unique(provider)); }
-    auto shared() const { return make_array(evaluate_as_shared(provider)); }
-
-private:
-    //=========================================================================
-    Provider provider;
-};
-
-
-
-
-//=============================================================================
 template<typename Function, std::size_t Rank>
 class nd::basic_provider_t
 {
@@ -803,6 +761,11 @@ public:
     decltype(auto) operator()(const index_t<Rank>& index) const { return mapping(index); }
     auto shape() const { return the_shape; }
     auto size() const { return the_shape.volume(); }
+
+    template<std::size_t NewRank> auto reshape(shape_t<NewRank>) const
+    {
+        throw std::logic_error("array provider cannot be reshaped");
+    }
 
 private:
     //=========================================================================
@@ -1326,6 +1289,33 @@ auto nd::ones(Args... args)
 
 
 
+/**
+ * @brief      Try to promote the argument to an array of the given shape
+ *
+ * @param      arg    The argument
+ * @param[in]  shape  The shape
+ *
+ * @tparam     Arg    The argument type
+ * @tparam     Rank   The rank of the shape to promote the argument to
+ *
+ * @return     An array with the given shape
+ */
+template<typename Arg, std::size_t Rank>
+auto nd::promote(Arg&& arg, nd::shape_t<Rank> shape)
+{
+    if constexpr (std::is_arithmetic<std::remove_reference_t<Arg>>::value)
+    {
+        return make_array(make_uniform_provider(arg, shape));
+    }
+    else
+    {
+        return arg;
+    }
+}
+
+
+
+
 //=============================================================================
 // Operator factories
 //=============================================================================
@@ -1519,7 +1509,6 @@ auto nd::transform(Function&& function)
 
 
 
-
 template<typename Function>
 auto nd::binary_op(Function&& function)
 {
@@ -1539,6 +1528,65 @@ auto nd::binary_op(Function&& function)
         return nd::make_array(basic_provider_t<decltype(mapping), RankA>(mapping, A.shape()));
     };
 };
+
+
+
+
+
+//=============================================================================
+template<std::size_t Rank, typename Provider>
+class nd::array_t
+{
+public:
+
+    using provider_type = Provider;
+    using value_type = typename Provider::value_type;
+    static constexpr std::size_t rank = Rank;
+
+    //=========================================================================
+    array_t(Provider&& provider) : provider(std::move(provider)) {}
+
+    // indexing functions
+    //=========================================================================
+    template<typename... Args> decltype(auto) operator()(Args... args) const { return provider(make_index(args...)); }
+    template<typename... Args> decltype(auto) operator()(Args... args)       { return provider(make_index(args...)); }
+    decltype(auto) operator()(const index_t<Rank>& index) const { return provider(index); }
+    decltype(auto) operator()(const index_t<Rank>& index)       { return provider(index); }
+
+    // query functions and operator support
+    //=========================================================================
+    auto shape() const { return provider.shape(); }
+    auto size() const { return provider.size(); }
+    constexpr std::size_t get_rank() { return Rank; }
+    const Provider& get_provider() const { return provider; }
+    auto get_accessor() { return make_access_pattern(provider.shape()); }
+    template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
+    template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
+
+    // methods converting this to a memory-backed array
+    //=========================================================================
+    auto unique() const { return make_array(evaluate_as_unique(provider)); }
+    auto shared() const { return make_array(evaluate_as_shared(provider)); }
+
+    // arithmetic operators
+    //=========================================================================
+    template<typename T> auto operator+(T&& A) const { return bin_op(std::forward<T>(A), std::plus<>()); }
+    template<typename T> auto operator-(T&& A) const { return bin_op(std::forward<T>(A), std::minus<>()); }
+    template<typename T> auto operator*(T&& A) const { return bin_op(std::forward<T>(A), std::multiplies<>()); }
+    template<typename T> auto operator/(T&& A) const { return bin_op(std::forward<T>(A), std::divides<>()); }
+
+private:
+    //=========================================================================
+    template<typename OtherType, typename Function>
+    auto bin_op(OtherType&& other, Function&& function) const
+    {
+        auto F = binary_op(std::forward<Function>(function));
+        auto B = promote(std::forward<OtherType>(other), shape());
+        return F(*this, std::move(B));
+    }
+    Provider provider;
+};
+
 
 
 
