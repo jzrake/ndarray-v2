@@ -69,11 +69,9 @@ namespace nd
     template<typename ValueType, typename... Args> auto unique_array(Args... args);
     template<std::size_t Rank> auto index_array(shape_t<Rank> shape);
     template<typename... Args> auto index_array(Args... args);
-
+    template<typename... ArrayTypes> auto zip_arrays(ArrayTypes&&... arrays);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
-
-    template<typename... ArrayTypes> auto zip_arrays(ArrayTypes&&... arrays);
 
 
     // array operator factory functions
@@ -86,6 +84,7 @@ namespace nd
     template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType&&);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
     template<typename Function> auto transform(Function&& function);
+    template<typename Function> auto binary_op(Function&& function);
 
 
     // algorithm support structs
@@ -444,6 +443,29 @@ public:
             result[n] = this->operator[](n);
         }
         return result;
+    }
+
+    bool advance(index_t<Rank>& index) const
+    {
+        auto final = last_index();
+        int n = Rank - 1;
+
+        ++index[n];
+
+        while (index[n] >= final[n])
+        {
+            if (n == 0)
+            {
+                index = final;
+                return false;
+            }
+            index[n] = 0;
+
+            --n;
+
+            ++index[n];
+        }
+        return true;
     }
 };
 
@@ -1260,21 +1282,6 @@ auto nd::index_array(Args... args)
 
 
 
-template<typename ValueType, typename... Args>
-auto nd::zeros(Args... args)
-{
-    return make_array(nd::make_uniform_provider(ValueType(0), args...));
-}
-
-template<typename ValueType, typename... Args>
-auto nd::ones(Args... args)
-{
-    return make_array(nd::make_uniform_provider(ValueType(1), args...));
-}
-
-
-
-
 /**
  * @brief      Zip a sequence identically-shaped arrays together
  *
@@ -1298,6 +1305,22 @@ auto nd::zip_arrays(ArrayTypes&&... arrays)
     auto mapping = [arrays...] (auto&& index) { return std::make_tuple(arrays(index)...); };
 
     return make_array(basic_provider_t<decltype(mapping), Ranks[0]>(mapping, shapes[0]));
+}
+
+
+
+
+
+template<typename ValueType, typename... Args>
+auto nd::zeros(Args... args)
+{
+    return make_array(nd::make_uniform_provider(ValueType(0), args...));
+}
+
+template<typename ValueType, typename... Args>
+auto nd::ones(Args... args)
+{
+    return make_array(nd::make_uniform_provider(ValueType(1), args...));
 }
 
 
@@ -1492,6 +1515,30 @@ auto nd::transform(Function&& function)
         return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, array.shape()));
     };
 }
+
+
+
+
+
+template<typename Function>
+auto nd::binary_op(Function&& function)
+{
+    return [function] (auto&& A, auto&& B)
+    {
+        constexpr std::size_t RankA = std::remove_reference_t<decltype(A)>::rank;
+        constexpr std::size_t RankB = std::remove_reference_t<decltype(B)>::rank;
+
+        if (A.shape() != B.shape())
+        {
+            throw std::logic_error("binary operation applied to arrays of different shapes");
+        }
+        auto mapping = [function, A, B] (auto&& index)
+        {
+            return function(A(index), B(index));
+        };
+        return nd::make_array(basic_provider_t<decltype(mapping), RankA>(mapping, A.shape()));
+    };
+};
 
 
 

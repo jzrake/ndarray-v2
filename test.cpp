@@ -5,63 +5,6 @@
 
 
 //=============================================================================
-struct test_t
-{
-    int thing() const &
-    {
-        return 1;
-    }
-    int thing() &&
-    {
-        return 2;
-    }
-};
-
-
-
-
-//=============================================================================
-template<typename... Args>
-bool all_equal(Args... args)
-{
-    auto a = {std::forward<Args>(args)...};
-    return std::adjacent_find(std::begin(a), std::end(a), std::not_equal_to<>()) == std::end(a);
-}
-
-template<typename Function, typename... Args>
-bool all_equal_transformed(Function&& fn, Args&&... args)
-{
-    auto a = {fn(std::forward<Args>(args))...};
-    return std::adjacent_find(std::begin(a), std::end(a), std::not_equal_to<>()) == std::end(a);
-}
-
-
-
-
-//=============================================================================
-TEST_CASE("rvalue-reference method works as expected")
-{
-    auto t = test_t();
-    REQUIRE(t.thing() == 1);
-    REQUIRE(std::move(t).thing() == 2);
-}
-
-TEST_CASE("all_equal works correctly")
-{
-    auto fac = [] (int n, int m) { return nd::make_array(nd::make_unique_provider<double>(n, m)); };
-    REQUIRE(all_equal(1));
-    REQUIRE(all_equal(1, 1));
-    REQUIRE(all_equal(1, 1, 1));
-    REQUIRE_FALSE(all_equal(1, 2));
-    REQUIRE_FALSE(all_equal(1, 2, 3));
-    REQUIRE(all_equal_transformed([] (auto) {return 0;}, 1, 2, 3));
-    REQUIRE_FALSE(all_equal_transformed([] (auto i) {return i * 2;}, 1, 2, 3));
-    REQUIRE(all_equal_transformed([] (auto c) {return c.size();}, fac(10, 10), fac(10, 10)));
-    REQUIRE(all_equal_transformed([] (auto c) {return c.shape();}, fac(10, 10), fac(10, 10)));
-    REQUIRE_FALSE(all_equal_transformed([] (auto c) {return c.size();}, fac(10, 10), fac(5, 5)));
-    REQUIRE_FALSE(all_equal_transformed([] (auto c) {return c.shape();}, fac(10, 10), fac(5, 5)));
-}
-
 TEST_CASE("shapes can be constructed", "[shape]")
 {
     auto shape1 = nd::make_shape(10, 10, 10);
@@ -112,16 +55,16 @@ TEST_CASE("range can be constructed", "[distance] [enumerate] [range]")
     REQUIRE(nd::distance(nd::enumerate(nd::range(10))) == 10);
 }
 
-TEST_CASE("buffer can be constructed from", "[buffer]")
+TEST_CASE("buffer works as expected", "[buffer]")
 {
-    SECTION("Can instantiate an empty buffer")
+    SECTION("can instantiate an empty buffer")
     {
         nd::buffer_t<double> B;
         REQUIRE(B.size() == 0);
         REQUIRE(B.data() == nullptr);
     }
 
-    SECTION("Can instantiate a constant buffer")
+    SECTION("can instantiate a constant buffer")
     {
         nd::buffer_t<double> B(100, 1.5);
         REQUIRE(B.size() == 100);
@@ -130,7 +73,7 @@ TEST_CASE("buffer can be constructed from", "[buffer]")
         REQUIRE(B[99] == 1.5);
     }
 
-    SECTION("Can instantiate a buffer from input iterator")
+    SECTION("can instantiate a buffer from input iterator")
     {
         std::vector<int> A{0, 1, 2, 3};
         nd::buffer_t<double> B(A.begin(), A.end());
@@ -141,7 +84,7 @@ TEST_CASE("buffer can be constructed from", "[buffer]")
         REQUIRE(B[3] == 3);
     }
 
-    SECTION("Can move-construct and move-assign a buffer")
+    SECTION("can move-construct and move-assign a buffer")
     {
         nd::buffer_t<double> A(100, 1.5);
         nd::buffer_t<double> B(200, 2.0);
@@ -164,7 +107,7 @@ TEST_CASE("buffer can be constructed from", "[buffer]")
         REQUIRE(C[99] == 1.5);
     }
 
-    SECTION("Equality operators between buffers work correctly")
+    SECTION("equality operators between buffers work correctly")
     {
         nd::buffer_t<double> A(100, 1.5);   
         nd::buffer_t<double> B(100, 1.5);
@@ -503,3 +446,16 @@ TEST_CASE("select operator works as expected", "[select]")
         REQUIRE(A2.shape() == nd::make_shape(5, 5));
     }
 }
+
+TEST_CASE("binary operation works as expected")
+{
+    auto F = nd::binary_op(std::plus<>());
+    auto A = nd::ones(10, 10);
+    auto B = nd::ones<double>(10, 10);
+    auto b = nd::ones<double>(10, 11);
+    auto C = F(A, B);
+    static_assert(std::is_same<decltype(C(0, 0)), double>::value);
+    REQUIRE(C(0, 0) == 2.0);
+    REQUIRE_THROWS(F(A, b));
+}
+
