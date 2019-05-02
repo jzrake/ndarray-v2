@@ -1,6 +1,20 @@
 # Introduction
 Header-only implementation of an N-dimensional array for modern C++.
 
+
+## Quick-start
+
+Create a 10 x 20 array of zero-initialized ints:
+```C++
+auto A = nd::zeros(10, 20);
+```
+
+Add an array of doubles to it:
+```C++
+auto B = A + nd::ones<double>(10, 20);
+```
+
+
 ## Overview
 This library adopts an abstract notion of an array. An array is any mapping from a space of N-dimensional indexes `(i, j, ...)` to some type of value, and which defines a rectangular region (the shape) containing the valid indexes:
 
