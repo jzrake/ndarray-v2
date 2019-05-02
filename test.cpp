@@ -4,7 +4,6 @@
 
 
 
-
 //=============================================================================
 TEST_CASE("shapes can be constructed", "[shape]")
 {
@@ -325,7 +324,7 @@ TEST_CASE("replace operator works as expected", "[replace]")
         auto patch1 = nd::make_access_pattern(10).with_start(5);
         auto patch2 = nd::make_access_pattern(10).with_start(6);
         REQUIRE_NOTHROW(nd::replace(patch1, A2));
-        REQUIRE_THROWS(nd::replace(patch2, A2));
+        REQUIRE_THROWS(A1 | nd::replace(patch2, A2));
     }
     SECTION("replacing all of an array works")
     {
@@ -386,6 +385,12 @@ TEST_CASE("replace operator works as expected", "[replace]")
         {
             REQUIRE(A3(index)[0] == (index[0] % 2 == 0 ? index[0] / 2 : index[0]));
         }
+    }
+    SECTION("replace_from operator works", "[replace_from]")
+    {
+        auto A = nd::zeros(10, 10);
+        REQUIRE_NOTHROW(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 5)));
+        REQUIRE_THROWS(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 6)));
     }
 }
 
@@ -467,4 +472,3 @@ TEST_CASE("binary operation works as expected")
     REQUIRE((C * 2.0)(0, 0) == 4.0);
     REQUIRE((C / 2.0)(0, 0) == 1.0);
 }
-

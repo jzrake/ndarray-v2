@@ -75,6 +75,12 @@ namespace nd
     template<typename ValueType, std::size_t Rank> auto promote(ValueType&&, nd::shape_t<Rank>);
 
 
+    // array operator support structs
+    //=========================================================================
+    template<std::size_t Rank> class selector_t;
+    template<std::size_t Rank, typename ArrayType> class replacer_t;
+
+
     // array operator factory functions
     //=========================================================================
     auto shared();
@@ -83,7 +89,9 @@ namespace nd
     template<std::size_t Rank> auto reshape(shape_t<Rank> shape);
     template<typename... Args> auto reshape(Args... args);
     template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType&&);
+    template<typename... Args> auto replace_from(Args... args);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
+    template<typename... Args> auto select_from(Args... args);
     template<typename Function> auto transform(Function&& function);
     template<typename Function> auto binary_op(Function&& function);
 
@@ -742,6 +750,94 @@ public:
     index_t<Rank> start = make_uniform_index<Rank>(0);
     index_t<Rank> final = make_uniform_index<Rank>(0);
     jumps_t<Rank> jumps = make_uniform_jumps<Rank>(1);
+};
+
+
+
+
+//=============================================================================
+template<std::size_t Rank>
+class nd::selector_t
+{
+public:
+
+    //=========================================================================
+    selector_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
+
+    template<typename ArrayType>
+    auto operator()(ArrayType&& array) const
+    {
+        if (! region.within(array.shape()))
+        {
+            throw std::logic_error("out-of-bounds selection");
+        }
+        auto mapping = [array, region=region] (auto&& index) { return array(region.map_index(index)); };
+        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, region.shape()));
+    }
+
+    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
+    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
+    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
+    auto from   (index_t<Rank> arg) const { return selector_t(region.with_start(arg)); }
+    auto to     (index_t<Rank> arg) const { return selector_t(region.with_final(arg)); }
+    auto jumping(jumps_t<Rank> arg) const { return selector_t(region.with_jumps(arg)); }
+
+private:
+    //=========================================================================
+    access_pattern_t<Rank> region;
+};
+
+
+
+
+//=============================================================================
+template<std::size_t Rank, typename ArrayType>
+class nd::replacer_t
+{
+public:
+
+    //=========================================================================
+    replacer_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
+    replacer_t(access_pattern_t<Rank> region, ArrayType replacement_array)
+    : region(region)
+    , replacement_array(replacement_array) {}
+
+    template<typename PatchArrayType>
+    auto operator()(PatchArrayType&& array_to_patch) const
+    {
+        if (region.shape() != replacement_array.shape())
+        {
+            throw std::logic_error("region to replace has a different shape than the replacement array");
+        }
+
+        auto mapping = [region=region, replacement_array=replacement_array, array_to_patch=array_to_patch] (auto&& index)
+        {
+            if (region.generates(index))
+            {
+                return replacement_array(region.inverse_map_index(index));
+            }
+            return array_to_patch(index);
+        };
+        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, array_to_patch.shape()));
+    }
+
+    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
+    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
+    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
+    auto from   (index_t<Rank> arg) const { return replacer_t(region.with_start(arg), replacement_array); }
+    auto to     (index_t<Rank> arg) const { return replacer_t(region.with_final(arg), replacement_array); }
+    auto jumping(jumps_t<Rank> arg) const { return replacer_t(region.with_jumps(arg), replacement_array); }
+
+    template<typename OtherArrayType>
+    auto with(OtherArrayType&& new_replacement_array) const
+    {
+        return replacer_t<Rank, OtherArrayType>(region, std::forward<OtherArrayType>(new_replacement_array));
+    }
+
+private:
+    //=========================================================================
+    access_pattern_t<Rank> region;
+    ArrayType replacement_array;
 };
 
 
@@ -1434,24 +1530,14 @@ auto nd::bounds_check()
 template<std::size_t Rank, typename ArrayType>
 auto nd::replace(access_pattern_t<Rank> region_to_replace, ArrayType&& replacement_array)
 {
-    if (region_to_replace.shape() != replacement_array.shape())
-    {
-        throw std::logic_error("region to replace has a different shape than the replacement array");
-    }
+    return replacer_t<Rank, ArrayType>(region_to_replace, replacement_array);
+}
 
-    return [region_to_replace, replacement_array] (auto&& array_to_patch)
-    {
-        auto mapping = [region_to_replace, replacement_array, array_to_patch] (auto&& index)
-        {
-            if (region_to_replace.generates(index))
-            {
-                return replacement_array(region_to_replace.inverse_map_index(index));
-            }
-            return array_to_patch(index);
-        };
-        auto shape = array_to_patch.shape();
-        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, shape));
-    };
+template<typename... Args>
+auto nd::replace_from(Args... args)
+{
+    auto zeros = make_array(make_uniform_provider(0, make_uniform_shape<sizeof...(Args)>(1)));
+    return replacer_t<sizeof...(Args), decltype(zeros)>({}, zeros).from(args...);
 }
 
 
@@ -1467,20 +1553,16 @@ auto nd::replace(access_pattern_t<Rank> region_to_replace, ArrayType&& replaceme
  * @return     The operator.
  */
 template<std::size_t Rank>
-auto nd::select(nd::access_pattern_t<Rank> region_to_select)
+auto nd::select(access_pattern_t<Rank> region_to_select)
 {
-    return [region_to_select] (auto&& array)
-    {
-        if (! region_to_select.within(array.shape()))
-        {
-            throw std::logic_error("out-of-bounds selection");
-        }
-        auto mapping = [array, region_to_select] (auto&& index) { return array(region_to_select.map_index(index)); };
-        auto shape = region_to_select.shape();
-        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, shape));
-    };
+    return selector_t<Rank>(region_to_select);
 }
 
+template<typename... Args>
+auto nd::select_from(Args... args)
+{
+    return selector_t<sizeof...(Args)>().from(args...);
+}
 
 
 
@@ -1509,6 +1591,16 @@ auto nd::transform(Function&& function)
 
 
 
+/**
+ * @brief      Return a function that operates on two arrays, given a function
+ *             that operates on their value types.
+ *
+ * @param      function  The function
+ *
+ * @tparam     Function  The function type
+ *
+ * @return     The operator
+ */
 template<typename Function>
 auto nd::binary_op(Function&& function)
 {
@@ -1586,7 +1678,6 @@ private:
     }
     Provider provider;
 };
-
 
 
 
