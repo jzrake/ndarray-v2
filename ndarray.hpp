@@ -79,6 +79,7 @@ namespace nd
     //=========================================================================
     template<std::size_t Rank> class selector_t;
     template<std::size_t Rank, typename ArrayType> class replacer_t;
+    class axis_freezer_t;
 
 
     // array operator factory functions
@@ -92,6 +93,7 @@ namespace nd
     template<typename... Args> auto replace_from(Args... args);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
     template<typename... Args> auto select_from(Args... args);
+    auto freeze_axis(std::size_t axis_to_freeze);
     template<typename Function> auto transform(Function&& function);
     template<typename Function> auto binary_op(Function&& function);
 
@@ -437,10 +439,20 @@ public:
         return detail::remove_elements<shape_t<Rank - indexes.size()>>(*this, indexes);
     }
 
+    auto remove_element(std::size_t index) const
+    {
+        return detail::remove_elements<shape_t<Rank - 1>>(*this, {index});
+    }
+
     template<typename IndexContainer, typename Sequence>
     auto insert_elements(IndexContainer indexes, Sequence values) const
     {
         return detail::insert_elements<shape_t<Rank + indexes.size()>>(*this, indexes, values);
+    }
+
+    auto insert_element(std::size_t index, std::size_t value) const
+    {
+        return detail::insert_elements<shape_t<Rank + 1>>(*this, {index}, {value});
     }
 
     index_t<Rank> last_index() const
@@ -494,10 +506,20 @@ public:
         return detail::remove_elements<index_t<Rank - indexes.size()>>(*this, indexes);
     }
 
+    auto remove_element(std::size_t index) const
+    {
+        return detail::remove_elements<index_t<Rank - 1>>(*this, {index});
+    }
+
     template<typename IndexContainer, typename Sequence>
     auto insert_elements(IndexContainer indexes, Sequence values) const
     {
         return detail::insert_elements<index_t<Rank + indexes.size()>>(*this, indexes, values);
+    }
+
+    auto insert_element(std::size_t index, std::size_t value) const
+    {
+        return detail::insert_elements<index_t<Rank + 1>>(*this, {index}, {value});
     }
 
     bool operator<(const index_t<Rank>& other) const
@@ -756,6 +778,81 @@ public:
 
 
 //=============================================================================
+// Shape, index, and access pattern factories
+//=============================================================================
+
+
+
+
+template<typename... Args>
+auto nd::make_shape(Args... args)
+{
+    return shape_t<sizeof...(Args)>({std::size_t(args)...});
+}
+
+template<typename... Args>
+auto nd::make_index(Args... args)
+{
+    return index_t<sizeof...(Args)>({std::size_t(args)...});
+}
+
+template<typename... Args>
+auto nd::make_jumps(Args... args)
+{
+    return jumps_t<sizeof...(Args)>({long(args)...});
+}
+
+template<std::size_t Rank, typename Arg>
+auto nd::make_uniform_shape(Arg arg)
+{
+    return shape_t<Rank>::uniform(arg);
+}
+
+template<std::size_t Rank, typename Arg>
+auto nd::make_uniform_index(Arg arg)
+{
+    return index_t<Rank>::uniform(arg);
+}
+
+template<std::size_t Rank, typename Arg>
+auto nd::make_uniform_jumps(Arg arg)
+{
+    return jumps_t<Rank>::uniform(arg);
+}
+
+template<std::size_t Rank>
+auto nd::make_strides_row_major(shape_t<Rank> shape)
+{
+    auto result = memory_strides_t<Rank>();
+
+    result[Rank - 1] = 1;
+
+    if constexpr (Rank > 1)
+    {
+        for (int n = Rank - 2; n >= 0; --n)
+        {
+            result[n] = result[n + 1] * shape[n + 1];
+        }
+    }
+    return result;
+}
+
+template<std::size_t Rank>
+auto nd::make_access_pattern(shape_t<Rank> shape)
+{
+    return access_pattern_t<Rank>().with_final(index_t<Rank>::from_range(shape));
+}
+
+template<typename... Args>
+auto nd::make_access_pattern(Args... args)
+{
+    return access_pattern_t<sizeof...(Args)>().with_final(args...);
+}
+
+
+
+
+//=============================================================================
 template<std::size_t Rank>
 class nd::selector_t
 {
@@ -810,7 +907,7 @@ public:
             throw std::logic_error("region to replace has a different shape than the replacement array");
         }
 
-        auto mapping = [region=region, replacement_array=replacement_array, array_to_patch=array_to_patch] (auto&& index)
+        auto mapping = [region=region, replacement_array=replacement_array, array_to_patch] (auto&& index)
         {
             if (region.generates(index))
             {
@@ -838,6 +935,53 @@ private:
     //=========================================================================
     access_pattern_t<Rank> region;
     ArrayType replacement_array;
+};
+
+
+
+
+
+//=============================================================================
+class nd::axis_freezer_t
+{
+public:
+
+    //=========================================================================
+    axis_freezer_t(std::size_t axis_to_freeze, std::size_t index_to_freeze_at)
+    : axis_to_freeze(axis_to_freeze)
+    , index_to_freeze_at(index_to_freeze_at) {}
+
+    template<typename PatchArrayType>
+    auto operator()(PatchArrayType&& array_to_freeze) const
+    {
+        constexpr std::size_t Rank = std::remove_reference_t<decltype(array_to_freeze)>::rank;
+
+        if (axis_to_freeze >= Rank)
+        {
+            throw std::logic_error("cannot freeze axis greater than or equal to array rank");
+        }
+        auto mapping = [
+            axis_to_freeze=axis_to_freeze,
+            index_to_freeze_at=index_to_freeze_at,
+            array_to_freeze] (auto&& index)
+        {
+            return array_to_freeze(index.insert_elements(
+                make_index(axis_to_freeze),
+                make_index(index_to_freeze_at)));
+        };
+        auto shape = array_to_freeze.shape().remove_elements(make_index(axis_to_freeze));
+        return make_array(basic_provider_t<decltype(mapping), Rank - 1>(mapping, shape));
+    }
+
+    auto at_index(std::size_t new_index_to_freeze_at) const
+    {
+        return axis_freezer_t(axis_to_freeze, new_index_to_freeze_at);
+    }
+
+private:
+    //=========================================================================
+    std::size_t axis_to_freeze;
+    std::size_t index_to_freeze_at;
 };
 
 
@@ -1087,81 +1231,6 @@ private:
     std::size_t count = 0;
     ValueType* memory = nullptr;
 };
-
-
-
-
-//=============================================================================
-// Shape, index, and access pattern factories
-//=============================================================================
-
-
-
-
-template<typename... Args>
-auto nd::make_shape(Args... args)
-{
-    return shape_t<sizeof...(Args)>({std::size_t(args)...});
-}
-
-template<typename... Args>
-auto nd::make_index(Args... args)
-{
-    return index_t<sizeof...(Args)>({std::size_t(args)...});
-}
-
-template<typename... Args>
-auto nd::make_jumps(Args... args)
-{
-    return jumps_t<sizeof...(Args)>({long(args)...});
-}
-
-template<std::size_t Rank, typename Arg>
-auto nd::make_uniform_shape(Arg arg)
-{
-    return shape_t<Rank>::uniform(arg);
-}
-
-template<std::size_t Rank, typename Arg>
-auto nd::make_uniform_index(Arg arg)
-{
-    return index_t<Rank>::uniform(arg);
-}
-
-template<std::size_t Rank, typename Arg>
-auto nd::make_uniform_jumps(Arg arg)
-{
-    return jumps_t<Rank>::uniform(arg);
-}
-
-template<std::size_t Rank>
-auto nd::make_strides_row_major(shape_t<Rank> shape)
-{
-    auto result = memory_strides_t<Rank>();
-
-    result[Rank - 1] = 1;
-
-    if constexpr (Rank > 1)
-    {
-        for (int n = Rank - 2; n >= 0; --n)
-        {
-            result[n] = result[n + 1] * shape[n + 1];
-        }
-    }
-    return result;
-}
-
-template<std::size_t Rank>
-auto nd::make_access_pattern(shape_t<Rank> shape)
-{
-    return access_pattern_t<Rank>().with_final(index_t<Rank>::from_range(shape));
-}
-
-template<typename... Args>
-auto nd::make_access_pattern(Args... args)
-{
-    return access_pattern_t<sizeof...(Args)>().with_final(args...);
-}
 
 
 
@@ -1568,6 +1637,22 @@ auto nd::select_from(Args... args)
 
 
 /**
+ * @brief      Return an operator that freezes one index its argument array,
+ *             reducing its rank by 1.
+ *
+ * @param[in]  axis_to_freeze  The axis to freeze
+ *
+ * @return     The operator
+ */
+auto nd::freeze_axis(std::size_t axis_to_freeze)
+{
+    return axis_freezer_t(axis_to_freeze, 0);
+}
+
+
+
+
+/**
  * @brief      Return an operator that transforms the values of an array using
  *             the given function object.
  *
@@ -1644,6 +1729,8 @@ public:
     template<typename... Args> decltype(auto) operator()(Args... args)       { return provider(make_index(args...)); }
     decltype(auto) operator()(const index_t<Rank>& index) const { return provider(index); }
     decltype(auto) operator()(const index_t<Rank>& index)       { return provider(index); }
+    decltype(auto) data() const { return provider.data(); }
+    decltype(auto) data()       { return provider.data(); }
 
     // query functions and operator support
     //=========================================================================
@@ -1651,7 +1738,7 @@ public:
     auto size() const { return provider.size(); }
     constexpr std::size_t get_rank() { return Rank; }
     const Provider& get_provider() const { return provider; }
-    auto get_accessor() { return make_access_pattern(provider.shape()); }
+    auto indexes() { return make_access_pattern(provider.shape()); }
     template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
     template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
 

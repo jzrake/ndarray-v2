@@ -45,7 +45,67 @@ Create an array by substituting a region with values from another array:
 auto B = A | nd::replace_from(0, 0).to(10, 5).with(nd::zeros(10, 5));
 ```
 
-Transform an array element-wise
+Reduce the dimensionality of an array by slicing:
+```C++
+auto B = A | nd::freeze_axis(0).at_index(2);
+```
+
+Transform an array element-wise:
 ```C++
 auto B = A | nd::transform([] (auto x) { return x * x; });
 ```
+
+Create an array of tuples from arrays of identical shape:
+```C++
+auto ABC = nd::zip_arrays(A, B, C);
+auto a = std::get<0>(ABC(0, 0));
+```
+
+
+## Using the `unique_array`
+For most use cases, you should be able to build your arrays procedurally by composing a sequence of operators. However, it's sometimes necessary to modify the memory backing procedurally. This is the purpose of unique array (also called transients in other libraries based on immutable data).
+
+There are two ways to create a unique array: from scratch,
+
+```C++
+auto A = nd::unique_array(10, 20);
+```
+
+or from an existing array,
+
+```C++
+auto A = nd::ones(10, 20).unique();
+```
+
+Now, you can load data into the mutable array procedurally,
+
+```C++
+for (auto index : A.indexes())
+{
+    A(index) = index[0] + index[1];
+}
+```
+
+Your unique array has data in it, but you can't really do anything with it. Remember, it can't be sent it anywhere by value. That includes applying operators to it, since the operators use value (rather than reference) semantics. You need to move the array to a shared one:
+
+```C++
+auto B = A.shared();
+```
+
+There! Now you have an immutable, memory-backed array with the same data content as `A` had. But be aware... you did just incur a heavy-weight copy. Indeed, if you check, you'll see that
+
+```C++
+B.data() != A.data();
+```
+
+If you wanted, you could keep calling `A.shared()` to vend out new copies of its data.
+
+__Note__: only memory-backed arrays have a `data` member function. You'd get a compile error if you were to do `(A | select_from(5, 10)).data()`.
+
+Anyway, in many cases you don't need the unique array to generate more than a single immutable copy. So, you can use the move operator to avoid the copy,
+
+```C++
+auto B = std::move(A).shared();
+```
+
+Here, ownership of the data buffer is transferred to `B`, leaving `A` in a "valid but useless" state. You could reassign it to another unique array if you wanted to.

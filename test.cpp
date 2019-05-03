@@ -232,7 +232,7 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
         REQUIRE(A(0, 2, 0) == 2);
         REQUIRE(A(0, 0, 3) == 3);
         REQUIRE(A(1, 2, 3) == 123);
-        REQUIRE(A.get_provider().data() == data);
+        REQUIRE(A.data() == data);
 
         static_assert(std::is_same<decltype(A)::provider_type, nd::unique_provider_t<3, double>>::value);
     }
@@ -333,7 +333,7 @@ TEST_CASE("replace operator works as expected", "[replace]")
         auto patch = nd::make_access_pattern(10);
         auto A3 = A1 | nd::replace(patch, A2);
 
-        for (auto index : A3.get_accessor())
+        for (auto index : A3.indexes())
         {
             REQUIRE(A3(index) == 2.0);
         }
@@ -345,7 +345,7 @@ TEST_CASE("replace operator works as expected", "[replace]")
         auto patch = nd::make_access_pattern(5);
         auto A3 = A1 | nd::replace(patch, A2);
 
-        for (auto index : A3.get_accessor())
+        for (auto index : A3.indexes())
         {
             REQUIRE(A3(index) == (index[0] < 5 ? 2.0 : 1.0));
         }
@@ -357,7 +357,7 @@ TEST_CASE("replace operator works as expected", "[replace]")
         auto patch = nd::make_access_pattern(10).with_start(5);
         auto A3 = A1 | nd::replace(patch, A2);
 
-        for (auto index : A3.get_accessor())
+        for (auto index : A3.indexes())
         {
             REQUIRE(A3(index) == (index[0] < 5 ? 1.0 : 2.0));
         }
@@ -369,7 +369,7 @@ TEST_CASE("replace operator works as expected", "[replace]")
         auto patch = nd::make_access_pattern(10).with_start(5);
         auto A3 = A1 | nd::replace(patch, A2);
 
-        for (auto index : A3.get_accessor())
+        for (auto index : A3.indexes())
         {
             REQUIRE(A3(index)[0] == (index[0] < 5 ? index[0] : index[0] - 5));
         }
@@ -381,7 +381,7 @@ TEST_CASE("replace operator works as expected", "[replace]")
         auto patch = nd::make_access_pattern(10).with_start(0).with_jumps(2);
         auto A3 = A1 | nd::replace(patch, A2);
 
-        for (auto index : A3.get_accessor())
+        for (auto index : A3.indexes())
         {
             REQUIRE(A3(index)[0] == (index[0] % 2 == 0 ? index[0] / 2 : index[0]));
         }
@@ -401,7 +401,7 @@ TEST_CASE("transform operator works as expected", "[transform]")
         auto A1 = nd::index_array(10);
         auto A2 = A1 | nd::transform([] (auto i) { return i[0] * 2.0; });
 
-        for (auto index : A2.get_accessor())
+        for (auto index : A2.indexes())
         {
             REQUIRE(A2(index) == index[0] * 2.0);
         }
@@ -411,7 +411,7 @@ TEST_CASE("transform operator works as expected", "[transform]")
         auto B1 = nd::shared_array<double>(10);
         auto B2 = B1 | nd::transform([] (auto) { return 2.0; });
 
-        for (auto index : B2.get_accessor())
+        for (auto index : B2.indexes())
         {
             REQUIRE(B2(index) == 2.0);
         }
@@ -421,7 +421,7 @@ TEST_CASE("transform operator works as expected", "[transform]")
         auto C1 = nd::unique_array<double>(10);
         auto C2 = C1.shared() | nd::transform([] (auto) { return 2.0; });
 
-        for (auto index : C2.get_accessor())
+        for (auto index : C2.indexes())
         {
             REQUIRE(C2(index) == 2.0);
         }
@@ -451,6 +451,16 @@ TEST_CASE("select operator works as expected", "[select]")
         REQUIRE(A2(0, 0) == 0.0);
         REQUIRE(A2.shape() == nd::make_shape(5, 5));
     }
+}
+
+TEST_CASE("freeze_axis operator works as expected", "[freeze_axis]")
+{
+    auto A = nd::index_array(10, 10);
+    REQUIRE((A | nd::freeze_axis(0).at_index(5)).shape() == nd::make_shape(10));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5))(0) == nd::make_index(5, 0));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5))(5) == nd::make_index(5, 5));
+    REQUIRE((A | nd::freeze_axis(1).at_index(5))(0) == nd::make_index(0, 5));
+    REQUIRE((A | nd::freeze_axis(1).at_index(5))(5) == nd::make_index(5, 5));
 }
 
 TEST_CASE("binary operation works as expected")
