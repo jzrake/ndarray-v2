@@ -68,6 +68,26 @@ Or just on axis 1:
 auto B = A | nd::reduce_axis(1).taking_the(nd::standard_deviation());
 ```
 
+Determine whether all corresponding elements of two arrays are equal:
+```C++
+if ((A == B) | nd::all()) { ... }
+```
+
+Determine if any two are unequal:
+```C++
+if ((A != B) | nd::any()) { ... }
+```
+
+Obtain a 1d array of indexes where a condition is satisfied:
+```C++
+auto indexes = nd::where(A != B && B < C);
+```
+
+Read the values from an array at those indexes:
+```C++
+auto values  = D | nd::read_indexes(indexes);
+```
+
 Create an array of tuples from arrays of identical shape:
 ```C++
 auto ABC = nd::zip_arrays(A, B, C); // ABC(0, 0) is a std::tuple

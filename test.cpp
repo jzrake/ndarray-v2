@@ -494,3 +494,12 @@ TEST_CASE("can sum an array", "[sum]")
     REQUIRE((index_array(3) | transform([](auto i){return i[0];}) | sum()) == 3);
     REQUIRE((ones(10, 10) | sum()) == 100);
 }
+
+TEST_CASE("can test for equality", "[sum]")
+{
+    REQUIRE(bool((nd::ones(10, 10) == nd::ones(10, 10)) | nd::sum()));
+    REQUIRE(bool((nd::ones(10, 10) == nd::ones(10, 10)) | nd::all()));
+    REQUIRE(bool((nd::ones(10, 10) == nd::ones<double>(10, 10)) | nd::all()));
+    REQUIRE(bool((nd::ones(10, 10) != nd::zeros<double>(10, 10)) | nd::all()));
+    REQUIRE_FALSE(bool((nd::ones(10, 10) == nd::zeros<double>(10, 10)) | nd::any()));
+}

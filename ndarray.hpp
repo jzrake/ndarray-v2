@@ -87,6 +87,10 @@ namespace nd
     auto shared();
     auto unique();
     auto bounds_check();
+    auto sum();
+    auto all();
+    auto any();
+    auto freeze_axis(std::size_t axis_to_freeze);
     template<std::size_t Rank> auto reshape(shape_t<Rank> shape);
     template<typename... Args> auto reshape(Args... args);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
@@ -97,8 +101,6 @@ namespace nd
     template<typename... Args> auto replace_from(Args... args);
     template<std::size_t Rank> auto read_index(index_t<Rank>);
     template<typename... Args> auto read_index(Args... args);
-    auto freeze_axis(std::size_t axis_to_freeze);
-    auto sum();
     template<typename Function> auto transform(Function&& function);
     template<typename Function> auto binary_op(Function&& function);
 
@@ -1552,6 +1554,65 @@ auto nd::bounds_check()
 
 
 /**
+ * @brief      Return an operator that sums the elements of an array.
+ *
+ * @return     The operator
+ */
+auto nd::sum()
+{
+    return [] (auto&& array)
+    {
+        auto result = nd::value_type_t<decltype(array)>();
+
+        for (const auto& i : array.indexes())
+        {
+            result += array(i);
+        }
+        return result;
+    };
+}
+
+
+
+
+auto nd::all()
+{
+    return [] (auto&& array)
+    {
+        for (const auto& i : array.indexes()) if (! array(i)) return false;
+        return true;
+    };
+}
+
+auto nd::any()
+{
+    return [] (auto&& array)
+    {
+        for (const auto& i : array.indexes()) if (array(i)) return true;
+        return false;
+    };
+}
+
+
+
+
+/**
+ * @brief      Return an operator that freezes one index its argument array,
+ *             reducing its rank by 1.
+ *
+ * @param[in]  axis_to_freeze  The axis to freeze
+ *
+ * @return     The operator
+ */
+auto nd::freeze_axis(std::size_t axis_to_freeze)
+{
+    return axis_freezer_t(axis_to_freeze, 0);
+}
+
+
+
+
+/**
  * @brief      Return an operator that selects a subset of an array.
  *
  * @param[in]  region_to_select  The region to select
@@ -1668,44 +1729,6 @@ auto nd::read_index(Args... args)
 
 
 /**
- * @brief      Return an operator that freezes one index its argument array,
- *             reducing its rank by 1.
- *
- * @param[in]  axis_to_freeze  The axis to freeze
- *
- * @return     The operator
- */
-auto nd::freeze_axis(std::size_t axis_to_freeze)
-{
-    return axis_freezer_t(axis_to_freeze, 0);
-}
-
-
-
-
-/**
- * @brief      Return an operator that sums the elements of an array.
- *
- * @return     The operator
- */
-auto nd::sum()
-{
-    return [] (auto&& array)
-    {
-        auto result = nd::value_type_t<decltype(array)>();
-
-        for (const auto& index : array.indexes())
-        {
-            result += array(index);
-        }
-        return result;
-    };
-}
-
-
-
-
-/**
  * @brief      Return an operator that transforms the values of an array using
  *             the given function object.
  *
@@ -1801,6 +1824,16 @@ public:
     template<typename T> auto operator-(T&& A) const { return bin_op(std::forward<T>(A), std::minus<>()); }
     template<typename T> auto operator*(T&& A) const { return bin_op(std::forward<T>(A), std::multiplies<>()); }
     template<typename T> auto operator/(T&& A) const { return bin_op(std::forward<T>(A), std::divides<>()); }
+    template<typename T> auto operator&&(T&& A) const { return bin_op(std::forward<T>(A), std::logical_and<>()); }
+    template<typename T> auto operator||(T&& A) const { return bin_op(std::forward<T>(A), std::logical_or<>()); }
+    template<typename T> auto operator==(T&& A) const { return bin_op(std::forward<T>(A), std::equal_to<>()); }
+    template<typename T> auto operator!=(T&& A) const { return bin_op(std::forward<T>(A), std::not_equal_to<>()); }
+    template<typename T> auto operator<=(T&& A) const { return bin_op(std::forward<T>(A), std::less_equal<>()); }
+    template<typename T> auto operator>=(T&& A) const { return bin_op(std::forward<T>(A), std::greater_equal<>()); }
+    template<typename T> auto operator<(T&& A) const { return bin_op(std::forward<T>(A), std::less<>()); }
+    template<typename T> auto operator>(T&& A) const { return bin_op(std::forward<T>(A), std::greater<>()); }
+    template<typename T> auto operator-() const { return transform(std::negate<>()); }
+    template<typename T> auto operator!() const { return transform(std::logical_not<>()); }
 
 private:
     //=========================================================================
