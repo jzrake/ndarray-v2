@@ -504,10 +504,11 @@ TEST_CASE("can test for equality", "[sum] [any] [all]")
     REQUIRE_FALSE(bool((nd::ones(10, 10) == nd::zeros<double>(10, 10)) | nd::any()));
 }
 
-TEST_CASE("can get an index array using where", "[where]")
+TEST_CASE("can get an index array using where, and pass that to read_indexes", "[where] [read_indexes]")
 {
     auto A = nd::index_array(10) | nd::transform([] (auto i) { return i[0]; });
     REQUIRE(nd::where(A < 5).size() == 5);
+    REQUIRE(bool(((A | nd::read_indexes(nd::where(A < 5))) < 5) | nd::all()));
 }
 
 TEST_CASE("can get the sum of a 3D array on each axis", "[collect]")

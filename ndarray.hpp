@@ -96,11 +96,11 @@ namespace nd
     template<typename ValueType, typename... Args> auto unique_array(Args... args);
     template<std::size_t Rank> auto index_array(shape_t<Rank> shape);
     template<typename... Args> auto index_array(Args... args);
-    template<typename... ArrayTypes> auto zip_arrays(ArrayTypes&&... arrays);
-    template<typename ArrayType> auto where(ArrayType&& array);
+    template<typename... ArrayTypes> auto zip_arrays(ArrayTypes... arrays);
+    template<typename ArrayType> auto where(ArrayType array);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
-    template<typename ValueType, std::size_t Rank> auto promote(ValueType&&, nd::shape_t<Rank>);
+    template<typename ValueType, std::size_t Rank> auto promote(ValueType, nd::shape_t<Rank>);
 
 
     // array operator support structs
@@ -121,20 +121,21 @@ namespace nd
     auto all();
     auto any();
     auto freeze_axis(std::size_t axis_to_freeze);
-    template<typename OperatorType> auto collect(OperatorType&& reduction);
-    template<typename ArrayType> auto concat(ArrayType&& array_to_concat);
+    template<typename OperatorType> auto collect(OperatorType reduction);
+    template<typename ArrayType> auto concat(ArrayType array_to_concat);
+    template<typename ArrayType> auto read_indexes(ArrayType array_of_indexes);
     template<std::size_t Rank> auto reshape(shape_t<Rank> shape);
     template<typename... Args> auto reshape(Args... args);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
-    template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType&&);
+    template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType);
     template<std::size_t Rank> auto select_from(index_t<Rank> starting_index);
     template<typename... Args> auto select_from(Args... args);
     template<std::size_t Rank> auto replace_from(index_t<Rank> starting_index);
     template<typename... Args> auto replace_from(Args... args);
     template<std::size_t Rank> auto read_index(index_t<Rank>);
     template<typename... Args> auto read_index(Args... args);
-    template<typename Function> auto transform(Function&& function);
-    template<typename Function> auto binary_op(Function&& function);
+    template<typename Function> auto transform(Function function);
+    template<typename Function> auto binary_op(Function function);
 
 
     // array query support
@@ -1538,9 +1539,9 @@ auto nd::index_array(Args... args)
  * @return     An array which returns tuples taken from the underlying arrays
  */
 template<typename... ArrayTypes>
-auto nd::zip_arrays(ArrayTypes&&... arrays)
+auto nd::zip_arrays(ArrayTypes... arrays)
 {
-    constexpr std::size_t Ranks[] = {std::remove_reference_t<ArrayTypes>::rank...};
+    constexpr std::size_t Ranks[] = {ArrayTypes::rank...};
     shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
 
     if (std::adjacent_find(std::begin(shapes), std::end(shapes), std::not_equal_to<>()) != std::end(shapes))
@@ -1608,9 +1609,9 @@ auto nd::ones(Args... args)
  * @return     An array with the given shape
  */
 template<typename Arg, std::size_t Rank>
-auto nd::promote(Arg&& arg, nd::shape_t<Rank> shape)
+auto nd::promote(Arg arg, nd::shape_t<Rank> shape)
 {
-    if constexpr (std::is_arithmetic<std::remove_reference_t<Arg>>::value)
+    if constexpr (std::is_arithmetic<Arg>::value)
     {
         return make_array(make_uniform_provider(arg, shape));
     }
@@ -1803,7 +1804,7 @@ auto nd::freeze_axis(std::size_t axis_to_freeze)
  * @return     The operator
  */
 template<typename OperatorType>
-auto nd::collect(OperatorType&& reduction)
+auto nd::collect(OperatorType reduction)
 {
     return axis_reducer_t<OperatorType>(0, std::forward<OperatorType>(reduction));
 }
@@ -1825,9 +1826,25 @@ auto nd::collect(OperatorType&& reduction)
  *             a logic_error if the array shapes are incompatible.
  */
 template<typename ArrayType>
-auto nd::concat(ArrayType&& array_to_concat)
+auto nd::concat(ArrayType array_to_concat)
 {
     return concatenator_t<ArrayType>(0, std::forward<ArrayType>(array_to_concat));
+}
+
+
+
+
+template<typename ArrayType>
+auto nd::read_indexes(ArrayType array_of_indexes)
+{
+    return [array_of_indexes] (auto array_to_index)
+    {
+        auto mapping = [array_of_indexes, array_to_index] (auto&& index)
+        {
+            return array_to_index(array_of_indexes(index));
+        };
+        return make_array(basic_provider_t<decltype(mapping), rank(array_of_indexes)>(mapping, array_of_indexes.shape()));
+    };
 }
 
 
@@ -1865,7 +1882,7 @@ auto nd::select(access_pattern_t<Rank> region_to_select)
  *             replacement_array, if those indexes are in the region to replace
  */
 template<std::size_t Rank, typename ArrayType>
-auto nd::replace(access_pattern_t<Rank> region_to_replace, ArrayType&& replacement_array)
+auto nd::replace(access_pattern_t<Rank> region_to_replace, ArrayType replacement_array)
 {
     return replacer_t<Rank, ArrayType>(region_to_replace, replacement_array);
 }
@@ -1960,7 +1977,7 @@ auto nd::read_index(Args... args)
  * @return     The operator
  */
 template<typename Function>
-auto nd::transform(Function&& function)
+auto nd::transform(Function function)
 {
     return [function] (auto array)
     {
@@ -1983,7 +2000,7 @@ auto nd::transform(Function&& function)
  * @return     The operator
  */
 template<typename Function>
-auto nd::binary_op(Function&& function)
+auto nd::binary_op(Function function)
 {
     return [function] (auto A, auto B)
     {
@@ -2021,7 +2038,7 @@ auto nd::binary_op(Function&& function)
  *             is the rank of the argument array
  */
 template<typename ArrayType>
-auto nd::where(ArrayType&& array)
+auto nd::where(ArrayType array)
 {
     auto bool_array = array | transform([] (auto x) { return bool(x); });
     auto index_list = unique_array<index_t<rank(bool_array)>>(bool_array | sum());
