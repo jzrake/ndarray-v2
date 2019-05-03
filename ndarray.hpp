@@ -9,6 +9,12 @@
 
 
 
+// TODO:
+// read-indexes
+// reduce / reduce_axis
+// concat
+
+
 
 //=============================================================================
 namespace nd
@@ -80,7 +86,8 @@ namespace nd
     //=========================================================================
     template<std::size_t Rank> class selector_t;
     template<std::size_t Rank, typename ArrayType> class replacer_t;
-    class axis_freezer_t;
+    template<std::size_t RankDifference> class axis_freezer_t;
+    // template<typename ArrayType> class axis_reducer_t;
 
 
     // array operator factory functions
@@ -911,49 +918,83 @@ private:
 
 
 
-
 //=============================================================================
+template<std::size_t RankDifference>
 class nd::axis_freezer_t
 {
 public:
 
     //=========================================================================
-    axis_freezer_t(std::size_t axis_to_freeze, std::size_t index_to_freeze_at)
-    : axis_to_freeze(axis_to_freeze)
+    axis_freezer_t(index_t<RankDifference> axes_to_freeze, index_t<RankDifference> index_to_freeze_at)
+    : axes_to_freeze(axes_to_freeze)
     , index_to_freeze_at(index_to_freeze_at) {}
 
     template<typename PatchArrayType>
-    auto operator()(PatchArrayType&& array_to_freeze) const
+    auto operator()(PatchArrayType array) const
     {
-        constexpr std::size_t Rank = std::remove_reference_t<decltype(array_to_freeze)>::rank;
-
-        if (axis_to_freeze >= Rank)
+        if (any_of(axes_to_freeze, [array] (auto a) { return a >= rank(array); }))
         {
             throw std::logic_error("cannot freeze axis greater than or equal to array rank");
         }
-        auto mapping = [
-            axis_to_freeze=axis_to_freeze,
-            index_to_freeze_at=index_to_freeze_at,
-            array_to_freeze] (auto&& index)
+        auto mapping = [axes_to_freeze=axes_to_freeze, index_to_freeze_at=index_to_freeze_at, array] (auto&& index)
         {
-            return array_to_freeze(index.insert_elements(
-                make_index(axis_to_freeze),
-                make_index(index_to_freeze_at)));
+            return array(index.insert_elements(axes_to_freeze, index_to_freeze_at));
         };
-        auto shape = array_to_freeze.shape().remove_elements(make_index(axis_to_freeze));
-        return make_array(basic_provider_t<decltype(mapping), Rank - 1>(mapping, shape));
+        auto shape = array.shape().remove_elements(axes_to_freeze);
+
+        return make_array(basic_provider_t<decltype(mapping), rank(array) - RankDifference>(mapping, shape));
     }
 
-    auto at_index(std::size_t new_index_to_freeze_at) const
+    template<typename... Args>
+    auto at_index(Args... new_index_to_freeze_at) const
     {
-        return axis_freezer_t(axis_to_freeze, new_index_to_freeze_at);
+        static_assert(sizeof...(Args) == RankDifference);
+        return axis_freezer_t(axes_to_freeze, make_index(new_index_to_freeze_at...));
     }
 
 private:
     //=========================================================================
-    std::size_t axis_to_freeze;
-    std::size_t index_to_freeze_at;
+    index_t<RankDifference> axes_to_freeze;
+    index_t<RankDifference> index_to_freeze_at;
 };
+
+
+
+
+//=============================================================================
+// template<typename OperatorType>
+// class nd::axis_reducer_t
+// {
+// public:
+
+//     //=========================================================================
+//     axis_reducer_t(std::size_t axis_to_reduce, OperatorType&& the_operator)
+//     : axis_to_reduce(axis_to_reduce)
+//     , the_operator(the_operator) {}
+
+//     template<typename ArrayType>
+//     auto operator()(ArrayType array_to_reduce) const
+//     {
+//         if (axis_to_reduce >= rank(array_to_reduce))
+//         {
+//             throw std::logic_error("cannot reduce axis greater than or equal to array rank");
+//         }
+
+//         auto mapping = [array_to_reduce] (auto&& index)
+//         {
+//             return array_to_reduce(index);
+//         };
+
+//         auto shape = array_to_reduce.shape().remove_elements(make_index(axis_to_reduce));
+//         return make_array(basic_provider_t<decltype(mapping), rank(array_to_reduce) - 1>(mapping, shape));
+//     }
+
+
+// private:
+//     //=========================================================================
+//     OperatorType the_operator;
+//     std::size_t axis_to_reduce;
+// };
 
 
 
@@ -1637,7 +1678,7 @@ auto nd::any()
  */
 auto nd::freeze_axis(std::size_t axis_to_freeze)
 {
-    return axis_freezer_t(axis_to_freeze, 0);
+    return axis_freezer_t<1>(make_index(axis_to_freeze), make_index(0));
 }
 
 

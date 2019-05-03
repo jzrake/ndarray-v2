@@ -1,5 +1,5 @@
 # Introduction
-Header-only implementation of an N-dimensional array for modern C++.
+_Header-only implementation of an N-dimensional array for modern C++_
 
 
 ## Overview
@@ -19,7 +19,7 @@ An array is a class template parameterized around a _provider_. Operations appli
 ## Immutability
 Arrays are immutable, meaning that you manipulate them by applying transformations to existing arrays to generate new ones. But they are also light-weight objects that incur essentially zero overhead when passed by value. This is because memory-backed arrays only hold a `std::shared_ptr` to an immutable memory buffer, while operated-on arrays only hold lightweight function objects. They do not allocate new memory buffers, and do not perform any calculations until they are indexed, or converted to a memory-backed array. Such lazy evaluation trades compile time overhead in exchange for runtime performace (the compiler sees the whole type hierarchy and can scrunch it down to perform optimizations) and reduced memory footprint.
 
-There is one exception to immutability, a `unique_array`, which is memory-backed and read/write, so it enables procedural loading of data into a memory-backed array. The `unique_array` owns its data buffer, and is move-constructible but not copy-constructible (following the semantics of `unique_ptr`). After loading data into it, it can be moved to a shared (immutable, copy-constructible) memory-backed array. The fact that mutable arrays cannot be copied ensures that you're not accidentally passing around heavyweight objects by value.
+There is one exception to immutability, a `unique_array`, which is memory-backed and read/write, so it enables procedural loading of data into a memory-backed array. The `unique_array` owns its data buffer, and is move-constructible but not copy-constructible (following the semantics of `unique_ptr`). After loading data into it, it can be moved to a shared (immutable, copy-constructible) memory-backed array. Mutable arrays are made to non-copyable to ensure that you're not accidentally passing around heavyweight objects by value.
 
 
 ## Quick-start
