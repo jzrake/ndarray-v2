@@ -527,3 +527,10 @@ TEST_CASE("can concat two 3d arrays on compatible axes", "[collect]")
     REQUIRE((ones(10, 10, 20) | concat(zeros(10, 10, 30)).on_axis(2) | read_index(0, 0, 20)) == 0);
     REQUIRE_THROWS(ones(10, 10, 20) | concat(zeros(10, 11, 30)).on_axis(2));
 }
+
+TEST_CASE("can create the cartesian product of arrays", "[cartesian_product]")
+{
+    auto A = nd::cartesian_product(nd::ones(10), nd::zeros(20));
+    REQUIRE(A.shape() == nd::make_shape(10, 20));
+    REQUIRE(A(0, 0) == std::make_tuple(1, 0));
+}

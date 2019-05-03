@@ -98,6 +98,11 @@ Concatenate another array:
 auto B = nd::ones(10, 10, 5) | nd::concat(nd::zeros(10, 10, 3)).on_axis(2);
 ```
 
+Take the cartesian product of a sequence of arrays:
+```C++
+auto X = nd::cartesian_product(x, y, z); // X(i, j, k) == make_tuple(x(i), y(i), z(k))
+```
+
 ## Using the `unique_array`
 For most use cases, you should be able to create the array you need by composing operators on it. However, it's sometimes necessary to modify the memory backing procedurally. This is the purpose of unique array (also called transients in other libraries based on immutable data).
 

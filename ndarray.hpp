@@ -27,12 +27,13 @@
 
 #pragma once
 #include <algorithm>         // std::all_of
+#include <array>             // convert indexes to std::array
 #include <functional>        // std::ref
 #include <initializer_list>  // std::initializer_list
 #include <iterator>          // std::distance
 #include <numeric>           // std::accumulate
-#include <utility>           // std::index_sequence
 #include <string>            // std::to_string
+#include <utility>           // std::index_sequence
 
 
 
@@ -97,6 +98,7 @@ namespace nd
     template<std::size_t Rank> auto index_array(shape_t<Rank> shape);
     template<typename... Args> auto index_array(Args... args);
     template<typename... ArrayTypes> auto zip_arrays(ArrayTypes... arrays);
+    template<typename... ArrayTypes> auto cartesian_product(ArrayTypes... arrays);
     template<typename ArrayType> auto where(ArrayType array);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
@@ -171,6 +173,12 @@ namespace nd
 
         template<typename Function, typename Tuple>
         auto transform_tuple(Function&& fn, const Tuple& t);
+
+        template<typename FunctionTuple, typename ArgumentTuple, std::size_t... Is>
+        auto zip_apply_tuple_impl(FunctionTuple&& fn, ArgumentTuple&& args, std::index_sequence<Is...>);
+
+        template<typename FunctionTuple, typename ArgumentTuple>
+        auto zip_apply_tuple(FunctionTuple&& fn, ArgumentTuple&& args);
 
         template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
         auto read_elements(const SourceSequence& source, IndexContainer indexes);
@@ -521,6 +529,23 @@ class nd::index_t : public nd::short_sequence_t<Rank, std::size_t, index_t<Rank>
 {
 public:
     using short_sequence_t<Rank, std::size_t, index_t<Rank>>::short_sequence_t;
+
+    /**
+     * @brief      This method is useful so that std::get can be applied to an
+     *             index
+     *
+     * @return     a std::array version of the index.
+     */
+    auto to_std_array() const
+    {
+        auto result = std::array<std::size_t, Rank>();
+
+        for (std::size_t n = 0; n < result.size(); ++n)
+        {
+            result[n] = this->operator[](n);
+        }
+        return result;
+    }
 
     template<typename IndexContainer>
     auto read_elements(IndexContainer indexes) const
@@ -1236,7 +1261,7 @@ public:
     uniform_provider_t(shape_t<Rank> the_shape, ValueType the_value) : the_shape(the_shape), the_value(the_value) {}
     const ValueType& operator()(const index_t<Rank>&) const { return the_value; }
     auto shape() const { return the_shape; }
-    auto size() { return the_shape.volume(); }
+    auto size() const { return the_shape.volume(); }
     template<std::size_t NewRank> auto reshape(shape_t<NewRank> new_shape) const { return uniform_provider_t<NewRank, ValueType>(new_shape, the_value); }
 
 private:
@@ -1552,6 +1577,31 @@ auto nd::zip_arrays(ArrayTypes... arrays)
     auto mapping = [arrays...] (auto&& index) { return std::make_tuple(arrays(index)...); };
 
     return make_array(basic_provider_t<decltype(mapping), Ranks[0]>(mapping, shapes[0]));
+}
+
+
+
+
+/**
+ * @brief      Return an array that is the cartesian product of the argument
+ *             arrays, A(i, j, k) == make_tuple(a(i), b(j), c(k))
+ *
+ * @param[in]  arrays      A sequence of 1d arrays
+ *
+ * @tparam     ArrayTypes  The types of the argument arrays
+ *
+ * @return     The array
+ */
+template<typename... ArrayTypes>
+auto nd::cartesian_product(ArrayTypes... arrays)
+{
+    shape_t<sizeof...(ArrayTypes)> shape = {arrays.size()...};
+
+    auto mapping = [arrays...] (auto&& index)
+    {
+        return detail::zip_apply_tuple(std::forward_as_tuple(arrays...), index.to_std_array());
+    };
+    return make_array(basic_provider_t<decltype(mapping), sizeof...(ArrayTypes)>(mapping, shape));
 }
 
 
@@ -2157,6 +2207,21 @@ template<typename Function, typename Tuple>
 auto nd::detail::transform_tuple(Function&& fn, const Tuple& t)
 {
     return transform_tuple_impl(fn, t, std::make_index_sequence<std::tuple_size<Tuple>::value>());
+}
+
+template<typename FunctionTuple, typename ArgumentTuple, std::size_t... Is>
+auto nd::detail::zip_apply_tuple_impl(FunctionTuple&& fn, ArgumentTuple&& args, std::index_sequence<Is...>)
+{
+    return std::make_tuple(std::get<Is>(fn)(std::get<Is>(args))...);
+}
+
+template<typename FunctionTuple, typename ArgumentTuple>
+auto nd::detail::zip_apply_tuple(FunctionTuple&& fn, ArgumentTuple&& args)
+{
+    return zip_apply_tuple_impl(
+        std::forward<FunctionTuple>(fn),
+        std::forward<ArgumentTuple>(args),
+        std::make_index_sequence<std::tuple_size<ArgumentTuple>::value>());
 }
 
 template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
