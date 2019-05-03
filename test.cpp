@@ -510,11 +510,19 @@ TEST_CASE("can get an index array using where", "[where]")
     REQUIRE(nd::where(A < 5).size() == 5);
 }
 
-TEST_CASE("can get the sum of a 3D array on each axis", "[reduce]")
+TEST_CASE("can get the sum of a 3D array on each axis", "[collect]")
 {
     auto A = nd::ones(10, 20, 30);
 
     REQUIRE((A | nd::collect(nd::sum()).along_axis(0) | nd::read_index(0, 0)) == 10);
     REQUIRE((A | nd::collect(nd::sum()).along_axis(1) | nd::read_index(0, 0)) == 20);
     REQUIRE((A | nd::collect(nd::sum()).along_axis(2) | nd::read_index(0, 0)) == 30);
+}
+
+TEST_CASE("can concat two 3d arrays on compatible axes", "[collect]")
+{
+    using namespace nd;
+    REQUIRE((ones(10, 10, 20) | concat(zeros(10, 10, 30)).on_axis(2) | read_index(0, 0, 19)) == 1);
+    REQUIRE((ones(10, 10, 20) | concat(zeros(10, 10, 30)).on_axis(2) | read_index(0, 0, 20)) == 0);
+    REQUIRE_THROWS(ones(10, 10, 20) | concat(zeros(10, 11, 30)).on_axis(2));
 }

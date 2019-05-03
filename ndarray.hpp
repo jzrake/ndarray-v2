@@ -1,3 +1,30 @@
+/**
+ ==============================================================================
+ Copyright 2019, Jonathan Zrake
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy of
+ this software and associated documentation files (the "Software"), to deal in
+ the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do
+ so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+ ==============================================================================
+*/
+
+
+
+
 #pragma once
 #include <algorithm>         // std::all_of
 #include <functional>        // std::ref
@@ -7,10 +34,6 @@
 #include <utility>           // std::index_sequence
 #include <string>            // std::to_string
 
-
-
-// TODO:
-// concat
 
 
 
@@ -86,18 +109,20 @@ namespace nd
     template<std::size_t Rank, typename ArrayType> class replacer_t;
     template<std::size_t RankDifference> class axis_freezer_t;
     template<typename ArrayType> class axis_reducer_t;
+    template<typename ArrayType> class concatenator_t;
 
 
     // array operator factory functions
     //=========================================================================
-    auto shared();
-    auto unique();
+    auto to_shared();
+    auto to_unique();
     auto bounds_check();
     auto sum();
     auto all();
     auto any();
     auto freeze_axis(std::size_t axis_to_freeze);
     template<typename OperatorType> auto collect(OperatorType&& reduction);
+    template<typename ArrayType> auto concat(ArrayType&& array_to_concat);
     template<std::size_t Rank> auto reshape(shape_t<Rank> shape);
     template<typename... Args> auto reshape(Args... args);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
@@ -1020,8 +1045,62 @@ public:
 
 private:
     //=========================================================================
-    OperatorType the_operator;
     std::size_t axis_to_reduce;
+    OperatorType the_operator;
+};
+
+
+
+
+//=============================================================================
+template<typename ArrayType>
+class nd::concatenator_t
+{
+public:
+
+    //=========================================================================
+    concatenator_t(std::size_t axis_to_extend, ArrayType array_to_concat)
+    : axis_to_extend(axis_to_extend)
+    , array_to_concat(array_to_concat) {}
+
+    template<typename SourceArrayType>
+    auto operator()(SourceArrayType array) const
+    {
+        if (axis_to_extend >= rank(array))
+        {
+            throw std::logic_error("cannot concatenate on axis greater than or equal to array rank");
+        }
+        if (array_to_concat.shape().remove_elements(make_index(axis_to_extend))
+            !=        array.shape().remove_elements(make_index(axis_to_extend)))
+        {
+            throw std::logic_error("the shape of the concatenated arrays can only differ on the concatenating axis");
+        }
+
+        auto mapping = [axis_to_extend=axis_to_extend, array_to_concat=array_to_concat, array] (auto index)
+        {
+            if (index[axis_to_extend] >= array.shape()[axis_to_extend])
+            {
+                index[axis_to_extend] -= array.shape()[axis_to_extend];
+                return array_to_concat(index);
+            }
+            return array(index);
+        };
+
+        auto shape = array.shape();
+        shape[axis_to_extend] += array_to_concat.shape()[axis_to_extend];
+
+        return make_array(basic_provider_t<decltype(mapping), rank(array)>(mapping, shape));
+    }
+
+    auto on_axis(std::size_t new_axis_to_concat) const
+    {
+        return concatenator_t(new_axis_to_concat, array_to_concat);
+    }
+
+private:
+    //=========================================================================
+    std::size_t axis_to_extend;
+    ArrayType array_to_concat;
 };
 
 
@@ -1591,7 +1670,7 @@ auto nd::reshape(Args... args)
  *
  * @return     The operator.
  */
-auto nd::shared()
+auto nd::to_shared()
 {
     return [] (auto&& array)
     {
@@ -1608,7 +1687,7 @@ auto nd::shared()
  *
  * @return     The operator.
  */
-auto nd::unique()
+auto nd::to_unique()
 {
     return [] (auto&& array)
     {
@@ -1727,6 +1806,28 @@ template<typename OperatorType>
 auto nd::collect(OperatorType&& reduction)
 {
     return axis_reducer_t<OperatorType>(0, std::forward<OperatorType>(reduction));
+}
+
+
+
+
+/**
+ * @brief      Return an operator that concats the given array onto another.
+ *
+ * @param      array_to_concat  The array to concatenate
+ *
+ * @tparam     ArrayType        The type of the array to concatenate
+ *
+ * @return     The operator
+ *
+ * @note       The returned operator will fail to compile if applied to arrays
+ *             of a different rank than the array to concatenate. It will throw
+ *             a logic_error if the array shapes are incompatible.
+ */
+template<typename ArrayType>
+auto nd::concat(ArrayType&& array_to_concat)
+{
+    return concatenator_t<ArrayType>(0, std::forward<ArrayType>(array_to_concat));
 }
 
 

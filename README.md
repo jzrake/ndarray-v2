@@ -95,7 +95,7 @@ auto ABC = nd::zip_arrays(A, B, C); // ABC(0, 0) is a std::tuple
 
 Concatenate another array:
 ```C++
-auto B = nd::ones(10, 10, 5) | nd::concat_axis(0).with(nd::zeros(10, 10, 3));
+auto B = nd::ones(10, 10, 5) | nd::concat(nd::zeros(10, 10, 3)).on_axis(2);
 ```
 
 ## Using the `unique_array`
@@ -149,3 +149,4 @@ Here, ownership of the data buffer is transferred to `B`, leaving `A` in a "vali
 
 ## Reshaping arrays
 The ability to reshape an array depends on the provider type. Memory-backed arrays can be reshaped to another array of the same total size. A `uniform_array` (returned by the `ones` and `zeros`) can be reshaped arbitrarily. All other arrays cannot be reshaped.
+
