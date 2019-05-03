@@ -10,8 +10,6 @@
 
 
 // TODO:
-// read-indexes
-// reduce / reduce_axis
 // concat
 
 
@@ -87,7 +85,7 @@ namespace nd
     template<std::size_t Rank> class selector_t;
     template<std::size_t Rank, typename ArrayType> class replacer_t;
     template<std::size_t RankDifference> class axis_freezer_t;
-    // template<typename ArrayType> class axis_reducer_t;
+    template<typename ArrayType> class axis_reducer_t;
 
 
     // array operator factory functions
@@ -99,6 +97,7 @@ namespace nd
     auto all();
     auto any();
     auto freeze_axis(std::size_t axis_to_freeze);
+    template<typename OperatorType> auto collect(OperatorType&& reduction);
     template<std::size_t Rank> auto reshape(shape_t<Rank> shape);
     template<typename... Args> auto reshape(Args... args);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
@@ -148,10 +147,13 @@ namespace nd
         auto transform_tuple(Function&& fn, const Tuple& t);
 
         template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
-        auto remove_elements(const SourceSequence& source, IndexContainer indexes);
+        auto read_elements(const SourceSequence& source, IndexContainer indexes);
 
         template<typename ResultSequence, typename SourceSequence, typename IndexContainer, typename Sequence>
         auto insert_elements(const SourceSequence& source, IndexContainer indexes, Sequence values);
+
+        template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
+        auto remove_elements(const SourceSequence& source, IndexContainer indexes);
     }
 }
 
@@ -455,15 +457,21 @@ public:
     }
 
     template<typename IndexContainer>
-    auto remove_elements(IndexContainer indexes) const
+    auto read_elements(IndexContainer indexes) const
     {
-        return detail::remove_elements<shape_t<Rank - indexes.size()>>(*this, indexes);
+        return detail::read_elements<shape_t<indexes.size()>>(*this, indexes);
     }
 
     template<typename IndexContainer, typename Sequence>
     auto insert_elements(IndexContainer indexes, Sequence values) const
     {
         return detail::insert_elements<shape_t<Rank + indexes.size()>>(*this, indexes, values);
+    }
+
+    template<typename IndexContainer>
+    auto remove_elements(IndexContainer indexes) const
+    {
+        return detail::remove_elements<shape_t<Rank - indexes.size()>>(*this, indexes);
     }
 
     index_t<Rank> last_index() const
@@ -489,15 +497,21 @@ public:
     using short_sequence_t<Rank, std::size_t, index_t<Rank>>::short_sequence_t;
 
     template<typename IndexContainer>
-    auto remove_elements(IndexContainer indexes) const
+    auto read_elements(IndexContainer indexes) const
     {
-        return detail::remove_elements<index_t<Rank - indexes.size()>>(*this, indexes);
+        return detail::read_elements<index_t<indexes.size()>>(*this, indexes);
     }
 
     template<typename IndexContainer, typename Sequence>
     auto insert_elements(IndexContainer indexes, Sequence values) const
     {
         return detail::insert_elements<index_t<Rank + indexes.size()>>(*this, indexes, values);
+    }
+
+    template<typename IndexContainer>
+    auto remove_elements(IndexContainer indexes) const
+    {
+        return detail::remove_elements<index_t<Rank - indexes.size()>>(*this, indexes);
     }
 
     bool operator<(const index_t<Rank>& other) const
@@ -925,7 +939,9 @@ class nd::axis_freezer_t
 public:
 
     //=========================================================================
-    axis_freezer_t(index_t<RankDifference> axes_to_freeze, index_t<RankDifference> index_to_freeze_at)
+    axis_freezer_t(
+        index_t<RankDifference> axes_to_freeze,
+        index_t<RankDifference> index_to_freeze_at=make_uniform_index<RankDifference>(0))
     : axes_to_freeze(axes_to_freeze)
     , index_to_freeze_at(index_to_freeze_at) {}
 
@@ -945,11 +961,16 @@ public:
         return make_array(basic_provider_t<decltype(mapping), rank(array) - RankDifference>(mapping, shape));
     }
 
+    auto at_index(index_t<RankDifference> new_index_to_freeze_at) const
+    {
+        return axis_freezer_t(axes_to_freeze, new_index_to_freeze_at);
+    }
+
     template<typename... Args>
     auto at_index(Args... new_index_to_freeze_at) const
     {
         static_assert(sizeof...(Args) == RankDifference);
-        return axis_freezer_t(axes_to_freeze, make_index(new_index_to_freeze_at...));
+        return at_index(make_index(new_index_to_freeze_at...));
     }
 
 private:
@@ -962,39 +983,46 @@ private:
 
 
 //=============================================================================
-// template<typename OperatorType>
-// class nd::axis_reducer_t
-// {
-// public:
+template<typename OperatorType>
+class nd::axis_reducer_t
+{
+public:
 
-//     //=========================================================================
-//     axis_reducer_t(std::size_t axis_to_reduce, OperatorType&& the_operator)
-//     : axis_to_reduce(axis_to_reduce)
-//     , the_operator(the_operator) {}
+    //=========================================================================
+    axis_reducer_t(std::size_t axis_to_reduce, OperatorType the_operator)
+    : axis_to_reduce(axis_to_reduce)
+    , the_operator(the_operator) {}
 
-//     template<typename ArrayType>
-//     auto operator()(ArrayType array_to_reduce) const
-//     {
-//         if (axis_to_reduce >= rank(array_to_reduce))
-//         {
-//             throw std::logic_error("cannot reduce axis greater than or equal to array rank");
-//         }
+    template<typename ArrayType>
+    auto operator()(ArrayType array) const
+    {
+        if (axis_to_reduce >= rank(array))
+        {
+            throw std::logic_error("cannot reduce axis greater than or equal to array rank");
+        }
+        constexpr std::size_t R = rank(array);
 
-//         auto mapping = [array_to_reduce] (auto&& index)
-//         {
-//             return array_to_reduce(index);
-//         };
+        auto mapping = [the_operator=the_operator, axis_to_reduce=axis_to_reduce, array] (auto&& index)
+        {
+            auto axes_to_freeze = index_t<R>::from_range(range(R)).remove_elements(make_index(axis_to_reduce));
+            auto freezer = axis_freezer_t<R - 1>(axes_to_freeze).at_index(index.read_elements(axes_to_freeze));
+            return the_operator(freezer(array));
+        };
+        auto shape = array.shape().remove_elements(make_index(axis_to_reduce));
 
-//         auto shape = array_to_reduce.shape().remove_elements(make_index(axis_to_reduce));
-//         return make_array(basic_provider_t<decltype(mapping), rank(array_to_reduce) - 1>(mapping, shape));
-//     }
+        return make_array(basic_provider_t<decltype(mapping), R - 1>(mapping, shape));
+    }
 
+    auto along_axis(std::size_t new_axis_to_reduce) const
+    {
+        return axis_reducer_t(new_axis_to_reduce, the_operator);
+    }
 
-// private:
-//     //=========================================================================
-//     OperatorType the_operator;
-//     std::size_t axis_to_reduce;
-// };
+private:
+    //=========================================================================
+    OperatorType the_operator;
+    std::size_t axis_to_reduce;
+};
 
 
 
@@ -1014,7 +1042,7 @@ public:
     auto shape() const { return the_shape; }
     auto size() const { return the_shape.volume(); }
 
-    template<std::size_t NewRank> auto reshape(shape_t<NewRank>) const
+    template<std::size_t R> auto reshape(shape_t<R>) const
     {
         throw std::logic_error("array provider cannot be reshaped");
     }
@@ -1057,7 +1085,7 @@ public:
     auto shape() const { return the_shape; }
     auto size() const { return the_shape.volume(); }
     const ValueType* data() const { return buffer->data(); }
-    template<std::size_t NewRank> auto reshape(shape_t<NewRank> new_shape) const { return shared_provider_t<NewRank, ValueType>(new_shape, buffer); }
+    template<std::size_t R> auto reshape(shape_t<R> new_shape) const { return shared_provider_t<R, ValueType>(new_shape, buffer); }
 
 private:
     //=========================================================================
@@ -1102,8 +1130,8 @@ public:
     auto shared() const & { return shared_provider_t(the_shape, std::make_shared<buffer_t<ValueType>>(buffer.begin(), buffer.end())); }
     auto shared()      && { return shared_provider_t(the_shape, std::make_shared<buffer_t<ValueType>>(std::move(buffer))); }
 
-    template<std::size_t NewRank> auto reshape(shape_t<NewRank> new_shape) const & { return unique_provider_t<NewRank, ValueType>(new_shape, buffer_t<ValueType>(buffer.begin(), buffer.end())); }
-    template<std::size_t NewRank> auto reshape(shape_t<NewRank> new_shape)      && { return unique_provider_t<NewRank, ValueType>(new_shape, std::move(buffer)); }
+    template<std::size_t R> auto reshape(shape_t<R> new_shape) const & { return unique_provider_t<R, ValueType>(new_shape, buffer_t<ValueType>(buffer.begin(), buffer.end())); }
+    template<std::size_t R> auto reshape(shape_t<R> new_shape)      && { return unique_provider_t<R, ValueType>(new_shape, std::move(buffer)); }
 
 private:
     //=========================================================================
@@ -1678,7 +1706,27 @@ auto nd::any()
  */
 auto nd::freeze_axis(std::size_t axis_to_freeze)
 {
-    return axis_freezer_t<1>(make_index(axis_to_freeze), make_index(0));
+    return axis_freezer_t<1>(make_index(axis_to_freeze));
+}
+
+
+
+
+/**
+ * @brief      Return a reducer operator, which can apply the given operator
+ *             along a given axis
+ *
+ * @param      reduction     The reduction
+ *
+ * @tparam     OperatorType  The type of function object to be applied along an
+ *                           axis
+ *
+ * @return     The operator
+ */
+template<typename OperatorType>
+auto nd::collect(OperatorType&& reduction)
+{
+    return axis_reducer_t<OperatorType>(0, std::forward<OperatorType>(reduction));
 }
 
 
@@ -1994,14 +2042,14 @@ auto nd::detail::transform_tuple(Function&& fn, const Tuple& t)
 }
 
 template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
-auto nd::detail::remove_elements(const SourceSequence& source, IndexContainer indexes)
+auto nd::detail::read_elements(const SourceSequence& source, IndexContainer indexes)
 {
     auto target_n = std::size_t(0);
     auto result = ResultSequence();
 
     for (std::size_t n = 0; n < source.size(); ++n)
     {
-        if (std::find(std::begin(indexes), std::end(indexes), n) == std::end(indexes))
+        if (std::find(std::begin(indexes), std::end(indexes), n) != std::end(indexes))
         {
             result[target_n++] = source[n];
         }
@@ -2027,6 +2075,23 @@ auto nd::detail::insert_elements(const SourceSequence& source, IndexContainer in
         else
         {
             result[n] = values[source2_n++];
+        }
+    }
+    return result;
+}
+
+
+template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
+auto nd::detail::remove_elements(const SourceSequence& source, IndexContainer indexes)
+{
+    auto target_n = std::size_t(0);
+    auto result = ResultSequence();
+
+    for (std::size_t n = 0; n < source.size(); ++n)
+    {
+        if (std::find(std::begin(indexes), std::end(indexes), n) == std::end(indexes))
+        {
+            result[target_n++] = source[n];
         }
     }
     return result;

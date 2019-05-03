@@ -491,7 +491,7 @@ TEST_CASE("can read an index from an array", "[read_index]")
 TEST_CASE("can sum an array", "[sum]")
 {
     using namespace nd;
-    REQUIRE((index_array(3) | transform([](auto i){return i[0];}) | sum()) == 3);
+    REQUIRE((index_array(3) | transform([] (auto i) { return i[0]; }) | sum()) == 3);
     REQUIRE((ones(10, 10) | sum()) == 100);
 }
 
@@ -506,6 +506,15 @@ TEST_CASE("can test for equality", "[sum] [any] [all]")
 
 TEST_CASE("can get an index array using where", "[where]")
 {
-    auto A = nd::index_array(10) | nd::transform([](auto i) { return i[0]; });
+    auto A = nd::index_array(10) | nd::transform([] (auto i) { return i[0]; });
     REQUIRE(nd::where(A < 5).size() == 5);
+}
+
+TEST_CASE("can get the sum of a 3D array on each axis", "[reduce]")
+{
+    auto A = nd::ones(10, 20, 30);
+
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(0) | nd::read_index(0, 0)) == 10);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(1) | nd::read_index(0, 0)) == 20);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(2) | nd::read_index(0, 0)) == 30);
 }

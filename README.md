@@ -65,7 +65,7 @@ auto total = A | nd::sum();
 
 Or just on axis 1:
 ```C++
-auto B = A | nd::reduce_axis(1).taking_the(nd::standard_deviation());
+auto B = A | nd::collect(nd::standard_deviation()).along_axis(1);
 ```
 
 Determine whether all corresponding elements of two arrays are equal:
