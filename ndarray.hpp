@@ -439,20 +439,10 @@ public:
         return detail::remove_elements<shape_t<Rank - indexes.size()>>(*this, indexes);
     }
 
-    auto remove_element(std::size_t index) const
-    {
-        return detail::remove_elements<shape_t<Rank - 1>>(*this, {index});
-    }
-
     template<typename IndexContainer, typename Sequence>
     auto insert_elements(IndexContainer indexes, Sequence values) const
     {
         return detail::insert_elements<shape_t<Rank + indexes.size()>>(*this, indexes, values);
-    }
-
-    auto insert_element(std::size_t index, std::size_t value) const
-    {
-        return detail::insert_elements<shape_t<Rank + 1>>(*this, {index}, {value});
     }
 
     index_t<Rank> last_index() const
@@ -464,29 +454,6 @@ public:
             result[n] = this->operator[](n);
         }
         return result;
-    }
-
-    bool advance(index_t<Rank>& index) const
-    {
-        auto final = last_index();
-        int n = Rank - 1;
-
-        ++index[n];
-
-        while (index[n] >= final[n])
-        {
-            if (n == 0)
-            {
-                index = final;
-                return false;
-            }
-            index[n] = 0;
-
-            --n;
-
-            ++index[n];
-        }
-        return true;
     }
 };
 
@@ -506,20 +473,10 @@ public:
         return detail::remove_elements<index_t<Rank - indexes.size()>>(*this, indexes);
     }
 
-    auto remove_element(std::size_t index) const
-    {
-        return detail::remove_elements<index_t<Rank - 1>>(*this, {index});
-    }
-
     template<typename IndexContainer, typename Sequence>
     auto insert_elements(IndexContainer indexes, Sequence values) const
     {
         return detail::insert_elements<index_t<Rank + indexes.size()>>(*this, indexes, values);
-    }
-
-    auto insert_element(std::size_t index, std::size_t value) const
-    {
-        return detail::insert_elements<index_t<Rank + 1>>(*this, {index}, {value});
     }
 
     bool operator<(const index_t<Rank>& other) const

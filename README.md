@@ -39,6 +39,11 @@ auto shape = A.shape();
 auto size = A.size();
 ```
 
+Transform an array element-wise:
+```C++
+auto B = A | nd::transform([] (auto x) { return x * x; });
+```
+
 Create an array as a subset of another:
 ```C++
 auto B = A | nd::select_from(0, 0).to(10, 10).jumping(2, 2); // B.shape() == {5, 5}
@@ -54,17 +59,25 @@ Reduce the dimensionality of an array by slicing:
 auto B = A | nd::freeze_axis(0).at_index(2);
 ```
 
-Transform an array element-wise:
+Take the sum of all elements:
 ```C++
-auto B = A | nd::transform([] (auto x) { return x * x; });
+auto total = A | nd::sum();
+```
+
+Or just on axis 1:
+```C++
+auto B = A | nd::reduce_axis(1).taking_the(nd::standard_deviation());
 ```
 
 Create an array of tuples from arrays of identical shape:
 ```C++
-auto ABC = nd::zip_arrays(A, B, C);
-auto a = std::get<0>(ABC(0, 0));
+auto ABC = nd::zip_arrays(A, B, C); // ABC(0, 0) is a std::tuple
 ```
 
+Concatenate another array:
+```C++
+auto B = nd::ones(10, 10, 5) | nd::concat_axis(0).with(nd::zeros(10, 10, 3));
+```
 
 ## Using the `unique_array`
 For most use cases, you should be able to build your arrays procedurally by composing a sequence of operators. However, it's sometimes necessary to modify the memory backing procedurally. This is the purpose of unique array (also called transients in other libraries based on immutable data).
