@@ -495,11 +495,17 @@ TEST_CASE("can sum an array", "[sum]")
     REQUIRE((ones(10, 10) | sum()) == 100);
 }
 
-TEST_CASE("can test for equality", "[sum]")
+TEST_CASE("can test for equality", "[sum] [any] [all]")
 {
-    REQUIRE(bool((nd::ones(10, 10) == nd::ones(10, 10)) | nd::sum()));
+    REQUIRE(((nd::ones(10, 10) == nd::ones(10, 10)) | nd::sum()) == 100);
     REQUIRE(bool((nd::ones(10, 10) == nd::ones(10, 10)) | nd::all()));
     REQUIRE(bool((nd::ones(10, 10) == nd::ones<double>(10, 10)) | nd::all()));
     REQUIRE(bool((nd::ones(10, 10) != nd::zeros<double>(10, 10)) | nd::all()));
     REQUIRE_FALSE(bool((nd::ones(10, 10) == nd::zeros<double>(10, 10)) | nd::any()));
+}
+
+TEST_CASE("can get an index array using where", "[where]")
+{
+    auto A = nd::index_array(10) | nd::transform([](auto i) { return i[0]; });
+    REQUIRE(nd::where(A < 5).size() == 5);
 }

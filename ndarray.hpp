@@ -70,6 +70,7 @@ namespace nd
     template<std::size_t Rank> auto index_array(shape_t<Rank> shape);
     template<typename... Args> auto index_array(Args... args);
     template<typename... ArrayTypes> auto zip_arrays(ArrayTypes&&... arrays);
+    template<typename ArrayType> auto where(ArrayType&& array);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
     template<typename ValueType, std::size_t Rank> auto promote(ValueType&&, nd::shape_t<Rank>);
@@ -107,7 +108,7 @@ namespace nd
 
     // array query support
     //=========================================================================
-    template<typename ArrayType> using value_type_t = typename std::remove_reference_t<ArrayType>::value_type;
+    template<typename ArrayType> using value_type_of = typename std::remove_reference_t<ArrayType>::value_type;
     template<typename ArrayType> constexpr std::size_t rank(ArrayType&&) { return std::remove_reference_t<ArrayType>::rank; }
 
 
@@ -1327,7 +1328,6 @@ auto nd::shared_array(Args... args)
 
 
 
-
 /**
  * @brief      Makes a unique (mutable, non-copyable, memory-backed) array with
  *             the given shape.
@@ -1408,13 +1408,37 @@ auto nd::zip_arrays(ArrayTypes&&... arrays)
 
 
 
-
+/**
+ * @brief      Return an array of zeros with the given shape
+ *
+ * @param[in]  args       shape arguments
+ *
+ * @tparam     ValueType  Defaults to int; use e.g. zeros<double>(...) for other
+ *                        types
+ * @tparam     Args       Argument types (should be a positive integral type)
+ *
+ * @return     An array of zeros, only requiring storage for a single element.
+ */
 template<typename ValueType, typename... Args>
 auto nd::zeros(Args... args)
 {
     return make_array(nd::make_uniform_provider(ValueType(0), args...));
 }
 
+
+
+
+/**
+ * @brief      Return an array of ones with the given shape
+ *
+ * @param[in]  args       shape arguments
+ *
+ * @tparam     ValueType  Defaults to int; use e.g. ones<double>(...) for other
+ *                        types
+ * @tparam     Args       Argument types (should be a positive integral type)
+ *
+ * @return     An array of ones, only requiring storage for a single element.
+ */
 template<typename ValueType, typename... Args>
 auto nd::ones(Args... args)
 {
@@ -1557,12 +1581,19 @@ auto nd::bounds_check()
  * @brief      Return an operator that sums the elements of an array.
  *
  * @return     The operator
+ *
+ * @note       The return type is the same as the array value type, except if
+ *             it's bool - in which case the return type is unsigned long.
  */
 auto nd::sum()
 {
     return [] (auto&& array)
     {
-        auto result = nd::value_type_t<decltype(array)>();
+        using value_type = nd::value_type_of<decltype(array)>;
+        using is_boolean = std::is_same<value_type, bool>;
+        using result_type = std::conditional_t<is_boolean::value, unsigned long, value_type>;
+
+        auto result = result_type();
 
         for (const auto& i : array.indexes())
         {
@@ -1774,7 +1805,7 @@ auto nd::binary_op(Function&& function)
         {
             return function(A(index), B(index));
         };
-        return nd::make_array(basic_provider_t<decltype(mapping), rank(A)>(mapping, A.shape()));
+        return make_array(basic_provider_t<decltype(mapping), rank(A)>(mapping, A.shape()));
     };
 };
 
@@ -1782,6 +1813,58 @@ auto nd::binary_op(Function&& function)
 
 
 //=============================================================================
+// More array factories, which must be defined after the operator factories
+//=============================================================================
+
+
+
+
+/**
+ * @brief      Return a 1d array of containing the indexes where the given array
+ *             evaluates to true
+ *
+ * @param      array      The array
+ *
+ * @tparam     ArrayType  The type of the argument array
+ *
+ * @return     An immutable, memory-backed 1d array of index_t<rank>, where rank
+ *             is the rank of the argument array
+ */
+template<typename ArrayType>
+auto nd::where(ArrayType&& array)
+{
+    auto bool_array = array | transform([] (auto x) { return bool(x); });
+    auto index_list = unique_array<index_t<rank(bool_array)>>(bool_array | sum());
+
+    std::size_t n = 0;
+
+    for (auto index : bool_array.indexes())
+    {
+        if (bool_array(index))
+        {
+            index_list(n++) = index;
+        }
+    }
+    return index_list.shared();
+}
+
+
+
+
+//=============================================================================
+// The array class itself
+//=============================================================================
+
+
+
+
+/**
+ * @brief      The actual array class template
+ *
+ * @tparam     Rank      The array dimensionality
+ * @tparam     Provider  Type defining the index space and mapping from indexes
+ *                       to values
+ */
 template<std::size_t Rank, typename Provider>
 class nd::array_t
 {
@@ -1809,7 +1892,7 @@ public:
     auto size() const { return provider.size(); }
     constexpr std::size_t get_rank() { return Rank; }
     const Provider& get_provider() const { return provider; }
-    auto indexes() { return make_access_pattern(provider.shape()); }
+    auto indexes() const { return make_access_pattern(provider.shape()); }
     template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
     template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
 
