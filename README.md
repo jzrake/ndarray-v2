@@ -33,10 +33,9 @@ Add an array of doubles to it:
 auto B = A + nd::ones<double>(10, 20);
 ```
 
-Get the shape and total number of elements in an array:
+Reshape an array:
 ```C++
-auto shape = A.shape();
-auto size = A.size();
+auto B = A.reshape(200); // may require B.size() == A.size() (see section on reshaping)
 ```
 
 Transform an array element-wise:
@@ -80,7 +79,7 @@ auto B = nd::ones(10, 10, 5) | nd::concat_axis(0).with(nd::zeros(10, 10, 3));
 ```
 
 ## Using the `unique_array`
-For most use cases, you should be able to build your arrays procedurally by composing a sequence of operators. However, it's sometimes necessary to modify the memory backing procedurally. This is the purpose of unique array (also called transients in other libraries based on immutable data).
+For most use cases, you should be able to create the array you need by composing operators on it. However, it's sometimes necessary to modify the memory backing procedurally. This is the purpose of unique array (also called transients in other libraries based on immutable data).
 
 There are two ways to create a unique array: from scratch,
 
@@ -103,13 +102,13 @@ for (auto index : A.indexes())
 }
 ```
 
-Your unique array has data in it, but you can't really do anything with it. Remember, it can't be sent it anywhere by value. That includes applying operators to it, since the operators use value (rather than reference) semantics. You need to move the array to a shared one:
+Your unique array has data in it, but you can't really do anything with it. Remember, it can't be passed by value anywhere. That includes applying operators to it, since the operators use value (rather than reference) semantics. However, if you move the array to a shared one,
 
 ```C++
 auto B = A.shared();
 ```
 
-There! Now you have an immutable, memory-backed array with the same data content as `A` had. But be aware... you did just incur a heavy-weight copy. Indeed, if you check, you'll see that
+you now have an immutable, memory-backed array with the same data content as `A` had. But be aware... you did just incur a heavy-weight copy. Indeed, if you check, you'll see that
 
 ```C++
 B.data() != A.data();
@@ -126,3 +125,7 @@ auto B = std::move(A).shared();
 ```
 
 Here, ownership of the data buffer is transferred to `B`, leaving `A` in a "valid but useless" state. You could reassign it to another unique array if you wanted to.
+
+
+## Reshaping arrays
+The ability to reshape an array depends on the provider type. Memory-backed arrays can be reshaped to another array of the same total size. A `uniform_array` (returned by the `ones` and `zeros`) can be reshaped arbitrarily. All other arrays cannot be reshaped.
