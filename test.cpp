@@ -482,3 +482,15 @@ TEST_CASE("binary operation works as expected")
     REQUIRE((C * 2.0)(0, 0) == 4.0);
     REQUIRE((C / 2.0)(0, 0) == 1.0);
 }
+
+TEST_CASE("can read an index from an array", "[read_index]")
+{
+    REQUIRE((nd::ones(10, 20, 40) | nd::read_index(2, 3, 4)) == 1);
+}
+
+TEST_CASE("can sum an array", "[sum]")
+{
+    using namespace nd;
+    REQUIRE((index_array(3) | transform([](auto i){return i[0];}) | sum()) == 3);
+    REQUIRE((ones(10, 10) | sum()) == 100);
+}

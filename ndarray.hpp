@@ -89,13 +89,24 @@ namespace nd
     auto bounds_check();
     template<std::size_t Rank> auto reshape(shape_t<Rank> shape);
     template<typename... Args> auto reshape(Args... args);
-    template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType&&);
-    template<typename... Args> auto replace_from(Args... args);
     template<std::size_t Rank> auto select(access_pattern_t<Rank>);
+    template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType&&);
+    template<std::size_t Rank> auto select_from(index_t<Rank> starting_index);
     template<typename... Args> auto select_from(Args... args);
+    template<std::size_t Rank> auto replace_from(index_t<Rank> starting_index);
+    template<typename... Args> auto replace_from(Args... args);
+    template<std::size_t Rank> auto read_index(index_t<Rank>);
+    template<typename... Args> auto read_index(Args... args);
     auto freeze_axis(std::size_t axis_to_freeze);
+    auto sum();
     template<typename Function> auto transform(Function&& function);
     template<typename Function> auto binary_op(Function&& function);
+
+
+    // array query support
+    //=========================================================================
+    template<typename ArrayType> using value_type_t = typename std::remove_reference_t<ArrayType>::value_type;
+    template<typename ArrayType> constexpr std::size_t rank(ArrayType&&) { return std::remove_reference_t<ArrayType>::rank; }
 
 
     // algorithm support structs
@@ -1541,6 +1552,24 @@ auto nd::bounds_check()
 
 
 /**
+ * @brief      Return an operator that selects a subset of an array.
+ *
+ * @param[in]  region_to_select  The region to select
+ *
+ * @tparam     Rank              Rank of the both the source and target arrays
+ *
+ * @return     The operator.
+ */
+template<std::size_t Rank>
+auto nd::select(access_pattern_t<Rank> region_to_select)
+{
+    return selector_t<Rank>(region_to_select);
+}
+
+
+
+
+/**
  * @brief      Replace a subset of an array with the contents of another.
  *
  * @param[in]  region_to_replace  The region to replace
@@ -1559,35 +1588,80 @@ auto nd::replace(access_pattern_t<Rank> region_to_replace, ArrayType&& replaceme
     return replacer_t<Rank, ArrayType>(region_to_replace, replacement_array);
 }
 
-template<typename... Args>
-auto nd::replace_from(Args... args)
+
+
+
+/**
+ * @brief      Return a select operator starting at the begin index.
+ *
+ * @param[in]  starting_index  The starting index
+ *
+ * @tparam     Rank            The rank of the array to operate on
+ *
+ * @return     The operator
+ */
+template<std::size_t Rank>
+auto nd::select_from(index_t<Rank> starting_index)
 {
-    auto zeros = make_array(make_uniform_provider(0, make_uniform_shape<sizeof...(Args)>(1)));
-    return replacer_t<sizeof...(Args), decltype(zeros)>({}, zeros).from(args...);
+    return selector_t<Rank>().from(starting_index);
+}
+
+template<typename... Args>
+auto nd::select_from(Args... args)
+{
+    return select_from(make_index(args...));
 }
 
 
 
 
 /**
- * @brief      Return an operator that selects a subset of an array.
+ * @brief      Return a replace operator starting at the begin index.
  *
- * @param[in]  region_to_select  The region to select
+ * @param[in]  starting_index  The starting index
  *
- * @tparam     Rank              Rank of the both the source and target arrays
+ * @tparam     Rank            The rank of the array to operate on
  *
- * @return     The operator.
+ * @return     The operator
  */
 template<std::size_t Rank>
-auto nd::select(access_pattern_t<Rank> region_to_select)
+auto nd::replace_from(index_t<Rank> starting_index)
 {
-    return selector_t<Rank>(region_to_select);
+    auto zeros = make_array(make_uniform_provider(0, make_uniform_shape<Rank>(1)));
+    return replacer_t<Rank, decltype(zeros)>({}, zeros).from(starting_index);
 }
 
 template<typename... Args>
-auto nd::select_from(Args... args)
+auto nd::replace_from(Args... args)
 {
-    return selector_t<sizeof...(Args)>().from(args...);
+    return replace_from(make_index(args...));
+}
+
+
+
+
+/**
+ * @brief      Reads an index from an array.
+ *
+ * @param[in]  index_to_read  The index to read
+ *
+ * @tparam     Rank           The rank of the array that can be read from
+ *
+ * @return     The operator
+ */
+template<std::size_t Rank>
+auto nd::read_index(index_t<Rank> index_to_read)
+{
+    return [index_to_read] (auto&& array)
+    {
+        return array(index_to_read);
+    };
+}
+
+template<typename... Args>
+auto nd::read_index(Args... args)
+{
+    return read_index(make_index(args...));
 }
 
 
@@ -1610,6 +1684,28 @@ auto nd::freeze_axis(std::size_t axis_to_freeze)
 
 
 /**
+ * @brief      Return an operator that sums the elements of an array.
+ *
+ * @return     The operator
+ */
+auto nd::sum()
+{
+    return [] (auto&& array)
+    {
+        auto result = nd::value_type_t<decltype(array)>();
+
+        for (const auto& index : array.indexes())
+        {
+            result += array(index);
+        }
+        return result;
+    };
+}
+
+
+
+
+/**
  * @brief      Return an operator that transforms the values of an array using
  *             the given function object.
  *
@@ -1622,11 +1718,10 @@ auto nd::freeze_axis(std::size_t axis_to_freeze)
 template<typename Function>
 auto nd::transform(Function&& function)
 {
-    return [function] (auto&& array)
+    return [function] (auto array)
     {
-        constexpr std::size_t Rank = std::remove_reference_t<decltype(array)>::rank;
         auto mapping = [array, function] (auto&& index) { return function(array(index)); };
-        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, array.shape()));
+        return make_array(basic_provider_t<decltype(mapping), rank(array)>(mapping, array.shape()));
     };
 }
 
@@ -1646,11 +1741,8 @@ auto nd::transform(Function&& function)
 template<typename Function>
 auto nd::binary_op(Function&& function)
 {
-    return [function] (auto&& A, auto&& B)
+    return [function] (auto A, auto B)
     {
-        constexpr std::size_t RankA = std::remove_reference_t<decltype(A)>::rank;
-        constexpr std::size_t RankB = std::remove_reference_t<decltype(B)>::rank;
-
         if (A.shape() != B.shape())
         {
             throw std::logic_error("binary operation applied to arrays of different shapes");
@@ -1659,10 +1751,9 @@ auto nd::binary_op(Function&& function)
         {
             return function(A(index), B(index));
         };
-        return nd::make_array(basic_provider_t<decltype(mapping), RankA>(mapping, A.shape()));
+        return nd::make_array(basic_provider_t<decltype(mapping), rank(A)>(mapping, A.shape()));
     };
 };
-
 
 
 
