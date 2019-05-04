@@ -155,3 +155,62 @@ Here, ownership of the data buffer is transferred to `B`, leaving `A` in a "vali
 ## Reshaping arrays
 The ability to reshape an array depends on the provider type. Memory-backed arrays can be reshaped to another array of the same total size. A `uniform_array` (returned by the `ones` and `zeros`) can be reshaped arbitrarily. All other arrays cannot be reshaped.
 
+
+## Writing new operators
+Here is an example of how to write a custom operator. As a use-case, let's say you'd like to transform an array `A` through a function `f`,
+```C++
+auto B = A | nd::transform(f);
+```
+
+but `f` might throw an exception. We'll write an operator called `value_on_exception`, that catches the error and returns a value -1 as a default value:
+
+```C++
+auto B = A | nd::transform(f) | value_if_throws(-1);
+```
+
+Here is the code for the `value_if_throws` operator:
+
+```C++
+template<typename DefaultValueType>
+auto value_if_throws(DefaultValueType default_value)
+{
+    return [default_value] (auto array)
+    {
+        auto mapping = [array] (auto index)
+        {
+            try {
+                return array(index);
+            }
+            catch (...)
+            {
+                return default_value;
+            }
+        };
+        return make_array(mapping, array.shape());
+    };
+}
+```
+
+The arguments to `make_array` are a mapping (from N-dimensional indexes to some values), and an N-dimensional shape. In this case, the shape of new array is the same as that of the operand. This construct should free your imagination to cook up some interesting operators. As an exercise, try implementing a `transpose_axes` operation, or a `circular_shift`, or a `laplacian`.
+
+
+## Multi-threaded execution
+Arrays are not just objects for storing and retrieving data; they are types that can encode entire algorithms, which may involve considerable number crunching to evaluate. In general, you'll build your algorithm by composing a long sequence of operators, and then evaluate the whole thing to a memory-backed array,
+```C++
+auto the_algorithm(auto A, auto B)
+{
+    return (A | transform(sqrt) + B | op1)
+    | collect(standard_deviation()).along_axis(1)
+    | to_shared();
+}
+```
+But note, this evaluation is embarressingly parallel as a result of the immutability: each worker can execute `array::operator()` over a subset of the index space without worrying about race conditions! If we have a function to partition the index space, we can dispatch separate threads to evaluate each piece of the partition. Our algorithm would look like this:
+```C++
+auto the_algorithm(auto A, auto B)
+{
+    return (A | transform(sqrt) + B | op1)
+    | collect(standard_deviation()).along_axis(1)
+    | evaluate_on(workers);
+}
+```
+Note that reductions are also a type of evaluation, so we also want an operator like `reduce_on`.

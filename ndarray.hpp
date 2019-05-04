@@ -32,7 +32,6 @@
 #include <initializer_list>  // std::initializer_list
 #include <iterator>          // std::distance
 #include <numeric>           // std::accumulate
-#include <string>            // std::to_string
 #include <utility>           // std::index_sequence
 
 
@@ -91,6 +90,7 @@ namespace nd
     // array factory functions
     //=========================================================================
     template<typename Provider> auto make_array(Provider&&);
+    template<typename Mapping, std::size_t Rank> auto make_array(Mapping mapping, shape_t<Rank> shape);
     template<typename ValueType, std::size_t Rank> auto shared_array(shape_t<Rank> shape);
     template<typename ValueType, typename... Args> auto shared_array(Args... args);
     template<typename ValueType, std::size_t Rank> auto unique_array(shape_t<Rank> shape);
@@ -1349,9 +1349,7 @@ public:
     {
         if (offset >= count)
         {
-            throw std::out_of_range("buffer_t index out of range on index "
-                + std::to_string(offset) + " / "
-                + std::to_string(count));
+            throw std::out_of_range("buffer_t index out of range");
         }
         return memory[offset];
     }
@@ -1364,9 +1362,7 @@ public:
     {
         if (offset >= count)
         {
-            throw std::out_of_range("buffer_t index out of range on index "
-                + std::to_string(offset) + " / "
-                + std::to_string(count));
+            throw std::out_of_range("buffer_t index out of range");
         }
         return memory[offset];
     }
@@ -1433,7 +1429,7 @@ auto nd::evaluate_as_unique(Provider&& source_provider)
     auto target_accessor = make_access_pattern(target_shape);
     auto target_provider = make_unique_provider<value_type>(target_shape);
 
-    for (const auto& index : target_accessor)
+    for (auto index : target_accessor)
     {
         target_provider(index) = source_provider(index);
     }
@@ -1471,6 +1467,14 @@ auto nd::make_array(Provider&& provider)
     return array_t<Provider::rank, Provider>(std::forward<Provider>(provider));
 }
 
+
+
+
+template<typename Mapping, std::size_t Rank>
+auto nd::make_array(Mapping mapping, shape_t<Rank> shape)
+{
+    return make_array(basic_provider_t<Mapping, Rank>(mapping, shape));
+}
 
 
 
@@ -1573,10 +1577,11 @@ auto nd::zip_arrays(ArrayTypes... arrays)
     {
         throw std::logic_error("cannot zip arrays with different shapes");
     }
-
-    auto mapping = [arrays...] (auto&& index) { return std::make_tuple(arrays(index)...); };
-
-    return make_array(basic_provider_t<decltype(mapping), Ranks[0]>(mapping, shapes[0]));
+    auto mapping = [arrays...] (auto&& index)
+    {
+        return std::make_tuple(arrays(index)...);
+    };
+    return make_array(mapping, shapes[0]);
 }
 
 
@@ -1601,7 +1606,7 @@ auto nd::cartesian_product(ArrayTypes... arrays)
     {
         return detail::zip_apply_tuple(std::forward_as_tuple(arrays...), index.to_std_array());
     };
-    return make_array(basic_provider_t<decltype(mapping), sizeof...(ArrayTypes)>(mapping, shape));
+    return make_array(mapping, shape);
 }
 
 
@@ -1759,8 +1764,6 @@ auto nd::bounds_check()
 {
     return [] (auto&& array)
     {
-        constexpr std::size_t Rank = std::remove_reference_t<decltype(array)>::rank;
-
         auto mapping = [array] (auto&& index)
         {
             if (! array.shape().contains(index))
@@ -1769,7 +1772,7 @@ auto nd::bounds_check()
             }
             return array(index);
         };
-        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, array.shape()));
+        return make_array(mapping, array.shape());
     };
 }
 
@@ -1893,7 +1896,7 @@ auto nd::read_indexes(ArrayType array_of_indexes)
         {
             return array_to_index(array_of_indexes(index));
         };
-        return make_array(basic_provider_t<decltype(mapping), rank(array_of_indexes)>(mapping, array_of_indexes.shape()));
+        return make_array(mapping, array_of_indexes.shape());
     };
 }
 
@@ -2032,7 +2035,7 @@ auto nd::transform(Function function)
     return [function] (auto array)
     {
         auto mapping = [array, function] (auto&& index) { return function(array(index)); };
-        return make_array(basic_provider_t<decltype(mapping), rank(array)>(mapping, array.shape()));
+        return make_array(mapping, array.shape());
     };
 }
 
@@ -2062,7 +2065,7 @@ auto nd::binary_op(Function function)
         {
             return function(A(index), B(index));
         };
-        return make_array(basic_provider_t<decltype(mapping), rank(A)>(mapping, A.shape()));
+        return make_array(mapping, A.shape());
     };
 };
 
@@ -2262,7 +2265,6 @@ auto nd::detail::insert_elements(const SourceSequence& source, IndexContainer in
     }
     return result;
 }
-
 
 template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
 auto nd::detail::remove_elements(const SourceSequence& source, IndexContainer indexes)

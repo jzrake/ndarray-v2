@@ -1,4 +1,6 @@
 CXXFLAGS = -std=c++17 -O0 -Wextra -fsanitize=undefined
+# CXXFLAGS = -std=c++17 -O3 -Wextra
+
 HEADERS = ndarray.hpp
 
 default: test main
