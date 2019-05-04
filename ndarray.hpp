@@ -27,7 +27,6 @@
 
 #pragma once
 #include <algorithm>         // std::all_of
-#include <array>             // convert indexes to std::array
 #include <functional>        // std::ref
 #include <initializer_list>  // std::initializer_list
 #include <iterator>          // std::distance
@@ -530,21 +529,15 @@ class nd::index_t : public nd::short_sequence_t<Rank, std::size_t, index_t<Rank>
 public:
     using short_sequence_t<Rank, std::size_t, index_t<Rank>>::short_sequence_t;
 
-    /**
-     * @brief      This method is useful so that std::get can be applied to an
-     *             index
-     *
-     * @return     a std::array version of the index.
-     */
-    auto to_std_array() const
+    template <size_t... Is>
+    auto as_tuple(std::index_sequence<Is...>) const
     {
-        auto result = std::array<std::size_t, Rank>();
+        return std::make_tuple(this->operator[](Is)...);
+    }
 
-        for (std::size_t n = 0; n < result.size(); ++n)
-        {
-            result[n] = this->operator[](n);
-        }
-        return result;
+    auto as_tuple() const
+    {
+        return as_tuple(std::make_index_sequence<Rank>());
     }
 
     template<typename IndexContainer>
@@ -1604,7 +1597,7 @@ auto nd::cartesian_product(ArrayTypes... arrays)
 
     auto mapping = [arrays...] (auto&& index)
     {
-        return detail::zip_apply_tuple(std::forward_as_tuple(arrays...), index.to_std_array());
+        return detail::zip_apply_tuple(std::forward_as_tuple(arrays...), index.as_tuple());
     };
     return make_array(mapping, shape);
 }

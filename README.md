@@ -165,14 +165,14 @@ auto B = A | nd::transform(f);
 but `f` might throw an exception. We'll write an operator called `value_on_exception`, that catches the error and returns a value -1 as a default value:
 
 ```C++
-auto B = A | nd::transform(f) | value_if_throws(-1);
+auto B = A | nd::transform(f) | value_on_exception(-1);
 ```
 
-Here is the code for the `value_if_throws` operator:
+Here is the code for the `value_on_exception` operator:
 
 ```C++
-template<typename DefaultValueType>
-auto value_if_throws(DefaultValueType default_value)
+template<typename ValueType>
+auto value_on_exception(ValueType default_value)
 {
     return [default_value] (auto array)
     {
