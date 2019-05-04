@@ -19,7 +19,7 @@ An array is a class template parameterized around a _provider_. Operations appli
 ## Immutability
 Arrays are immutable, meaning that you manipulate them by applying transformations to existing arrays to generate new ones. But they are also light-weight objects that incur essentially zero overhead when passed by value. This is because memory-backed arrays only hold a `std::shared_ptr` to an immutable memory buffer, while operated-on arrays only hold lightweight function objects. They do not allocate new memory buffers, and do not perform any calculations until they are indexed, or converted to a memory-backed array. Such lazy evaluation trades compile time overhead in exchange for runtime performace (the compiler sees the whole type hierarchy and can scrunch it down to perform optimizations) and reduced memory footprint.
 
-There is one exception to immutability, a `unique_array`, which is memory-backed and read/write, so it enables procedural loading of data into a memory-backed array. The `unique_array` owns its data buffer, and is move-constructible but not copy-constructible (following the semantics of `unique_ptr`). After loading data into it, it can be moved to a shared (immutable, copy-constructible) memory-backed array. Mutable arrays are made non-copyable to ensure that you're not accidentally passing around heavyweight objects by value.
+There is one exception to immutability, a `unique_array`, which is memory-backed and read/write, so it enables procedural loading of data into a memory-backed array. The `unique_array` owns its data buffer, and is move-constructible but not copy-constructible (following the semantics of `std::unique_ptr`). After loading data into it, it can be moved to a shared (immutable, copy-constructible) memory-backed array. Mutable arrays are made non-copyable to ensure that you're not accidentally passing around heavyweight objects by value.
 
 
 ## Quick-start
@@ -46,6 +46,11 @@ auto B = A | nd::transform([] (auto x) { return x * x; });
 Create an array as a subset of another:
 ```C++
 auto B = A | nd::select_from(0, 0).to(10, 10).jumping(2, 2); // B.shape() == {5, 5}
+```
+
+Shift an array by some amount along an axis:
+```C++
+auto B = A | nd::shift_by(-2).along_axis(1); // B(i, j) == A(i, j + 2)
 ```
 
 Create an array by substituting a region with values from another array:
@@ -100,8 +105,9 @@ auto B = nd::ones(10, 10, 5) | nd::concat(nd::zeros(10, 10, 3)).on_axis(2);
 
 Take the cartesian product of a sequence of arrays:
 ```C++
-auto X = nd::cartesian_product(x, y, z); // X(i, j, k) == make_tuple(x(i), y(i), z(k))
+auto X = nd::cartesian_product(x, y, z); // X(i, j, k) == std::make_tuple(x(i), y(i), z(k))
 ```
+
 
 ## Using the `unique_array`
 For most use cases, you should be able to create the array you need by composing operators on it. However, it's sometimes necessary to modify the memory backing procedurally. This is the purpose of unique array (also called transients in other libraries based on immutable data).

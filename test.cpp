@@ -534,3 +534,16 @@ TEST_CASE("can create the cartesian product of arrays", "[cartesian_product]")
     REQUIRE(A.shape() == nd::make_shape(10, 20));
     REQUIRE(A(0, 0) == std::make_tuple(1, 0));
 }
+
+TEST_CASE("can shift an array", "[shift]")
+{
+    auto A = nd::index_array(10, 10);
+    REQUIRE((A | nd::shift_by(2).along_axis(0)).shape() == nd::make_shape(8, 10));
+    REQUIRE((A | nd::shift_by(2).along_axis(1)).shape() == nd::make_shape(10, 8));
+    REQUIRE((A | nd::shift_by(-2).along_axis(0)).shape() == nd::make_shape(8, 10));
+    REQUIRE((A | nd::shift_by(-2).along_axis(1)).shape() == nd::make_shape(10, 8));
+    REQUIRE((A | nd::shift_by(-2).along_axis(0) | nd::read_index(0, 0)) == nd::make_index(2, 0));
+    REQUIRE((A | nd::shift_by(-2).along_axis(1) | nd::read_index(0, 0)) == nd::make_index(0, 2));
+    REQUIRE((A | nd::shift_by(+2).along_axis(0) | nd::read_index(2, 0)) == nd::make_index(0, 0));
+    REQUIRE((A | nd::shift_by(+2).along_axis(1) | nd::read_index(0, 2)) == nd::make_index(0, 0));
+}

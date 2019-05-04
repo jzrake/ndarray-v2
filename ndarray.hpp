@@ -108,6 +108,7 @@ namespace nd
 
     // array operator support structs
     //=========================================================================
+    class shifter_t;
     template<std::size_t Rank> class selector_t;
     template<std::size_t Rank, typename ArrayType> class replacer_t;
     template<std::size_t RankDifference> class axis_freezer_t;
@@ -123,6 +124,7 @@ namespace nd
     auto sum();
     auto all();
     auto any();
+    auto shift_by(int delta);
     auto freeze_axis(std::size_t axis_to_freeze);
     template<typename OperatorType> auto collect(OperatorType reduction);
     template<typename ArrayType> auto concat(ArrayType array_to_concat);
@@ -918,6 +920,50 @@ auto nd::partition_shape(shape_t<Rank> shape)
 
 
 //=============================================================================
+class nd::shifter_t
+{
+public:
+
+    //=========================================================================
+    shifter_t(std::size_t axis_to_shift, int delta) : axis_to_shift(axis_to_shift), delta(delta) {}
+
+    template<typename ArrayType>
+    auto operator()(ArrayType&& array) const
+    {
+        if (axis_to_shift >= rank(array))
+        {
+            throw std::logic_error("cannot shift axis greater than or equal to array rank");
+        }
+        if (std::size_t(std::abs(delta)) >= array.shape()[axis_to_shift])
+        {
+            throw std::logic_error("cannot shift an array by more than its length on that axis");
+        }
+        auto mapping = [axis_to_shift=axis_to_shift, delta=delta, array] (auto index)
+        {
+            index[axis_to_shift] -= delta;
+            return array(index);
+        };
+        auto shape = array.shape();
+        shape[axis_to_shift] -= std::abs(delta);
+
+        return make_array(mapping, shape);
+    }
+
+    auto along_axis(std::size_t new_axis_to_shift) const
+    {
+        return shifter_t(new_axis_to_shift, delta);
+    }
+
+private:
+    //=========================================================================
+    std::size_t axis_to_shift;
+    int delta;
+};
+
+
+
+
+//=============================================================================
 template<std::size_t Rank>
 class nd::selector_t
 {
@@ -933,7 +979,7 @@ public:
         {
             throw std::logic_error("out-of-bounds selection");
         }
-        auto mapping = [array, region=region] (auto&& index) { return array(region.map_index(index)); };
+        auto mapping = [region=region, array] (auto&& index) { return array(region.map_index(index)); };
         return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, region.shape()));
     }
 
@@ -980,7 +1026,7 @@ public:
             }
             return array_to_patch(index);
         };
-        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, array_to_patch.shape()));
+        return make_array(mapping, array_to_patch.shape());
     }
 
     template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
@@ -1031,7 +1077,7 @@ public:
         };
         auto shape = array.shape().remove_elements(axes_to_freeze);
 
-        return make_array(basic_provider_t<decltype(mapping), rank(array) - RankDifference>(mapping, shape));
+        return make_array(mapping, shape);
     }
 
     auto at_index(index_t<RankDifference> new_index_to_freeze_at) const
@@ -1083,7 +1129,7 @@ public:
         };
         auto shape = array.shape().remove_elements(make_index(axis_to_reduce));
 
-        return make_array(basic_provider_t<decltype(mapping), R - 1>(mapping, shape));
+        return make_array(mapping, shape);
     }
 
     auto along_axis(std::size_t new_axis_to_reduce) const
@@ -1137,7 +1183,7 @@ public:
         auto shape = array.shape();
         shape[axis_to_extend] += array_to_concat.shape()[axis_to_extend];
 
-        return make_array(basic_provider_t<decltype(mapping), rank(array)>(mapping, shape));
+        return make_array(mapping, shape);
     }
 
     auto on_axis(std::size_t new_axis_to_concat) const
@@ -1846,6 +1892,23 @@ auto nd::any()
         for (const auto& i : array.indexes()) if (array(i)) return true;
         return false;
     };
+}
+
+
+
+
+/**
+ * @brief      Return an operator that shifts an array along an axis
+ *
+ * @param[in]  delta  The amount to shift by
+ *
+ * @return     The operator
+ * 
+ * @example    B = A | shift_by(-2).along_axis(1); // B(i, j) == A(i, j + 2)
+ */
+auto nd::shift_by(int delta)
+{
+    return shifter_t(0, delta);
 }
 
 
