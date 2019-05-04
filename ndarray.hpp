@@ -44,12 +44,13 @@ namespace nd
     // array support structs
     //=========================================================================
     template<std::size_t Rank, typename ValueType, typename DerivedType> class short_sequence_t;
-    template<std::size_t Rank, typename Provider> class array_t;
+    template<std::size_t Rank, typename ValueType> class basic_sequence_t;
     template<std::size_t Rank> class shape_t;
     template<std::size_t Rank> class index_t;
     template<std::size_t Rank> class jumps_t;
     template<std::size_t Rank> class memory_strides_t;
     template<std::size_t Rank> class access_pattern_t;
+    template<std::size_t Rank, typename Provider> class array_t;
     template<typename ValueType> class buffer_t;
 
 
@@ -64,6 +65,7 @@ namespace nd
     template<std::size_t Rank> auto make_strides_row_major(shape_t<Rank> shape);
     template<std::size_t Rank> auto make_access_pattern(shape_t<Rank> shape);
     template<typename... Args> auto make_access_pattern(Args... args);
+    template<std::size_t NumPartitions, std::size_t Rank> auto partition_shape(shape_t<Rank> shape);
 
 
     // provider types
@@ -101,7 +103,7 @@ namespace nd
     template<typename ArrayType> auto where(ArrayType array);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
-    template<typename ValueType, std::size_t Rank> auto promote(ValueType, nd::shape_t<Rank>);
+    template<typename ValueType, std::size_t Rank> auto promote(ValueType, shape_t<Rank>);
 
 
     // array operator support structs
@@ -464,6 +466,15 @@ public:
 private:
     //=========================================================================
     ValueType memory[Rank];
+};
+
+
+
+
+//=============================================================================
+template<std::size_t Size, typename ValueType>
+class nd::basic_sequence_t : public nd::short_sequence_t<Size, ValueType, basic_sequence_t<Size, ValueType>>
+{
 };
 
 
@@ -883,6 +894,24 @@ template<typename... Args>
 auto nd::make_access_pattern(Args... args)
 {
     return access_pattern_t<sizeof...(Args)>().with_final(args...);
+}
+
+template<std::size_t NumPartitions, std::size_t Rank>
+auto nd::partition_shape(shape_t<Rank> shape)
+{
+    // Note: this function should handle remainders better
+    constexpr std::size_t D = 0;
+    auto result = basic_sequence_t<NumPartitions, access_pattern_t<Rank>>();
+    auto chunk_size = shape[D] / NumPartitions;
+
+    for (std::size_t n = 0; n < NumPartitions; ++n)
+    {
+        auto pattern = make_access_pattern(shape);
+        pattern.start[D] = chunk_size * n;
+        pattern.final[D] = n == NumPartitions - 1 ? shape[D] : chunk_size * (n + 1);
+        result[n] = pattern;
+    }
+    return result;
 }
 
 

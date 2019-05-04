@@ -19,7 +19,7 @@ An array is a class template parameterized around a _provider_. Operations appli
 ## Immutability
 Arrays are immutable, meaning that you manipulate them by applying transformations to existing arrays to generate new ones. But they are also light-weight objects that incur essentially zero overhead when passed by value. This is because memory-backed arrays only hold a `std::shared_ptr` to an immutable memory buffer, while operated-on arrays only hold lightweight function objects. They do not allocate new memory buffers, and do not perform any calculations until they are indexed, or converted to a memory-backed array. Such lazy evaluation trades compile time overhead in exchange for runtime performace (the compiler sees the whole type hierarchy and can scrunch it down to perform optimizations) and reduced memory footprint.
 
-There is one exception to immutability, a `unique_array`, which is memory-backed and read/write, so it enables procedural loading of data into a memory-backed array. The `unique_array` owns its data buffer, and is move-constructible but not copy-constructible (following the semantics of `unique_ptr`). After loading data into it, it can be moved to a shared (immutable, copy-constructible) memory-backed array. Mutable arrays are made to non-copyable to ensure that you're not accidentally passing around heavyweight objects by value.
+There is one exception to immutability, a `unique_array`, which is memory-backed and read/write, so it enables procedural loading of data into a memory-backed array. The `unique_array` owns its data buffer, and is move-constructible but not copy-constructible (following the semantics of `unique_ptr`). After loading data into it, it can be moved to a shared (immutable, copy-constructible) memory-backed array. Mutable arrays are made non-copyable to ensure that you're not accidentally passing around heavyweight objects by value.
 
 
 ## Quick-start
@@ -195,22 +195,59 @@ The arguments to `make_array` are a mapping (from N-dimensional indexes to some 
 
 
 ## Multi-threaded execution
-Arrays are not just objects for storing and retrieving data; they are types that can encode entire algorithms, which may involve considerable number crunching to evaluate. In general, you'll build your algorithm by composing a long sequence of operators, and then evaluate the whole thing to a memory-backed array,
+Arrays are not just objects for storing and retrieving data; they are types that can encode entire algorithms, which may involve considerable number crunching to evaluate. In general, you'll build your algorithm by composing a sequence of operators, and then evaluate the whole thing to a memory-backed array,
 ```C++
 auto the_algorithm(auto A, auto B)
 {
-    return (A | transform(sqrt) + B | op1)
+    return ((A | transform(sqrt)) + B | some_operator)
     | collect(standard_deviation()).along_axis(1)
     | to_shared();
 }
 ```
-But note, this evaluation is embarressingly parallel as a result of the immutability: each worker can execute `array::operator()` over a subset of the index space without worrying about race conditions! If we have a function to partition the index space, we can dispatch separate threads to evaluate each piece of the partition. Our algorithm would look like this:
+This evaluation is _embarressingly parallel_ as a result of the immutability: each worker can execute `array::operator()` over a subset of the index space without worrying about race conditions! If we have a function to partition the index space, we can dispatch separate threads to evaluate each piece of the partition. It would be nice if our algorithm could just as easily be evaluated like this:
 ```C++
 auto the_algorithm(auto A, auto B)
 {
-    return (A | transform(sqrt) + B | op1)
+    return ((A | transform(sqrt)) + B | some_operator)
     | collect(standard_deviation()).along_axis(1)
-    | evaluate_on(workers);
+    | evaluate_on<4>();
 }
 ```
-Note that reductions are also a type of evaluation, so we also want an operator like `reduce_on`.
+
+Here is an implementation of an `evaluate_on` operator. It uses the `nd::partition_shape` function to create a sequence of disjoint access patterns which cover the index space.
+
+```C++
+template<std::size_t NumThreads>
+auto evaluate_on()
+{
+    return [] (auto array)
+    {
+        using value_type = typename decltype(array)::value_type;
+        auto provider = nd::make_unique_provider<value_type>(array.shape());
+        auto evaluate_partial = [&] (auto accessor)
+        {
+            return [accessor, array, &provider]
+            {
+                for (auto index : accessor)
+                {
+                    provider(index) = array(index);
+                }
+            };
+        };
+        auto threads = nd::basic_sequence_t<NumThreads, std::thread>();
+        auto regions = nd::partition_shape<NumThreads>(array.shape());
+
+        for (auto [n, accessor] : nd::enumerate(regions))
+            threads[n] = std::thread(evaluate_partial(accessor));
+
+        for (auto& thread : threads)
+            thread.join();
+
+        return nd::make_array(std::move(provider).shared());
+    };
+}
+```
+
+The actual mileage you'll get out of this approach may vary with type of memory access patterns your arrays are using, and what type of calculations are being done. Typically, the more work you do per evaluation of `operator()`, the better.
+
+Note that reductions are also a parallelizable operation - as an excerise, try implementing a multi-threaded `reduce_on` operator!
