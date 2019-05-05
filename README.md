@@ -48,6 +48,11 @@ Create an array as a subset of another:
 auto B = A | nd::select_from(0, 0).to(10, 10).jumping(2, 2); // B.shape() == {5, 5}
 ```
 
+Apply the selection to just one axis (optionally from the end)
+```C++
+auto B = A | nd::select_axis(1).from(3).to(3).from_the_end(); // B.shape(1) == A.shape(1) - 6
+```
+
 Shift an array by some amount along an axis:
 ```C++
 auto B = A | nd::shift_by(-2).along_axis(1); // B(i, j) == A(i, j + 2)

@@ -453,6 +453,19 @@ TEST_CASE("select operator works as expected", "[select]")
     }
 }
 
+TEST_CASE("select_axis operator works as expected", "[select_axis]")
+{
+    auto A = nd::index_array(10, 10);
+
+    REQUIRE((A | nd::select_axis(0).from(2).to(8)).shape() == nd::make_shape(6, 10));
+    REQUIRE((A | nd::select_axis(1).from(2).to(8)).shape() == nd::make_shape(10, 6));
+    REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end()).shape() == nd::make_shape(6, 10));
+    REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end()).shape() == nd::make_shape(10, 6));
+
+    REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(2, 0));
+    REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(0, 2));
+}
+
 TEST_CASE("freeze_axis operator works as expected", "[freeze_axis]")
 {
     auto A = nd::index_array(10, 10);

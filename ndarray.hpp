@@ -109,6 +109,7 @@ namespace nd
     // array operator support structs
     //=========================================================================
     class shifter_t;
+    class axis_selector_t;
     template<std::size_t Rank> class selector_t;
     template<std::size_t Rank, typename ArrayType> class replacer_t;
     template<std::size_t RankDifference> class axis_freezer_t;
@@ -125,6 +126,7 @@ namespace nd
     auto all();
     auto any();
     auto shift_by(int delta);
+    auto select_axis(std::size_t axis_to_select);
     auto freeze_axis(std::size_t axis_to_freeze);
     template<typename OperatorType> auto collect(OperatorType reduction);
     template<typename ArrayType> auto concat(ArrayType array_to_concat);
@@ -934,7 +936,7 @@ public:
         {
             throw std::logic_error("cannot shift axis greater than or equal to array rank");
         }
-        if (std::size_t(std::abs(delta)) >= array.shape()[axis_to_shift])
+        if (std::size_t(std::abs(delta)) >= array.shape(axis_to_shift))
         {
             throw std::logic_error("cannot shift an array by more than its length on that axis");
         }
@@ -958,6 +960,61 @@ private:
     //=========================================================================
     std::size_t axis_to_shift;
     int delta;
+};
+
+
+
+
+//=============================================================================
+class nd::axis_selector_t
+{
+public:
+
+    //=========================================================================
+    axis_selector_t(std::size_t axis_to_select, std::size_t start, std::size_t final, bool is_final_from_the_end)
+    : axis_to_select(axis_to_select)
+    , start(start)
+    , final(final)
+    , is_final_from_the_end(is_final_from_the_end) {}
+
+    template<typename ArrayType>
+    auto operator()(ArrayType&& array) const
+    {
+        if (axis_to_select >= rank(array))
+        {
+            throw std::logic_error("cannot select axis greater than or equal to array rank");
+        }
+        auto mapping = [axis_to_select=axis_to_select, start=start, array] (auto index)
+        {
+            index[axis_to_select] += start;
+            return array(index);
+        };
+
+        auto shape = array.shape();
+        shape[axis_to_select] -= start + (is_final_from_the_end ? final : (shape[axis_to_select] - final));
+
+        return make_array(mapping, shape);
+    }
+
+    auto from(std::size_t new_start) const
+    {
+        return axis_selector_t(axis_to_select, new_start, final, is_final_from_the_end);
+    }
+    auto to(std::size_t new_final) const
+    {
+        return axis_selector_t(axis_to_select, start, new_final, is_final_from_the_end);
+    }
+    auto from_the_end() const
+    {
+        return axis_selector_t(axis_to_select, start, final, true);        
+    }
+
+private:
+    //=========================================================================
+    std::size_t axis_to_select;
+    std::size_t start;
+    std::size_t final;
+    bool is_final_from_the_end;
 };
 
 
@@ -1172,16 +1229,16 @@ public:
 
         auto mapping = [axis_to_extend=axis_to_extend, array_to_concat=array_to_concat, array] (auto index)
         {
-            if (index[axis_to_extend] >= array.shape()[axis_to_extend])
+            if (index[axis_to_extend] >= array.shape(axis_to_extend))
             {
-                index[axis_to_extend] -= array.shape()[axis_to_extend];
+                index[axis_to_extend] -= array.shape(axis_to_extend);
                 return array_to_concat(index);
             }
             return array(index);
         };
 
         auto shape = array.shape();
-        shape[axis_to_extend] += array_to_concat.shape()[axis_to_extend];
+        shape[axis_to_extend] += array_to_concat.shape(axis_to_extend);
 
         return make_array(mapping, shape);
     }
@@ -2003,6 +2060,11 @@ auto nd::select(access_pattern_t<Rank> region_to_select)
     return selector_t<Rank>(region_to_select);
 }
 
+auto nd::select_axis(std::size_t axis_to_select)
+{
+    return axis_selector_t(axis_to_select, 0, 0, false);
+}
+
 
 
 
@@ -2234,6 +2296,7 @@ public:
     // query functions and operator support
     //=========================================================================
     auto shape() const { return provider.shape(); }
+    auto shape(std::size_t axis) const { return provider.shape()[axis]; }
     auto size() const { return provider.size(); }
     constexpr std::size_t get_rank() { return Rank; }
     const Provider& get_provider() const { return provider; }
@@ -2294,7 +2357,7 @@ auto nd::detail::transform_tuple_impl(Function&& fn, const Tuple& t, std::index_
 template<typename Function, typename Tuple>
 auto nd::detail::transform_tuple(Function&& fn, const Tuple& t)
 {
-    return transform_tuple_impl(fn, t, std::make_index_sequence<std::tuple_size<Tuple>::value>());
+    return transform_tuple_impl(std::forward<Function>(fn), t, std::make_index_sequence<std::tuple_size<Tuple>::value>());
 }
 
 template<typename FunctionTuple, typename ArgumentTuple, std::size_t... Is>
