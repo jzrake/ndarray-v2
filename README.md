@@ -75,7 +75,7 @@ auto total = A | nd::sum();
 
 Or just on axis 1:
 ```C++
-auto B = A | nd::collect(nd::standard_deviation()).along_axis(1);
+auto B = A | nd::collect(nd::sum()).along_axis(1);
 ```
 
 Determine whether all corresponding elements of two arrays are equal:
@@ -83,7 +83,7 @@ Determine whether all corresponding elements of two arrays are equal:
 if ((A == B) | nd::all()) { ... }
 ```
 
-Determine if any two are unequal:
+Determine if any two elements are unequal:
 ```C++
 if ((A != B) | nd::any()) { ... }
 ```
@@ -95,7 +95,7 @@ auto indexes = nd::where(A != B && B < C);
 
 Read the values from an array at those indexes:
 ```C++
-auto values  = D | nd::read_indexes(indexes);
+auto values = D | nd::read_indexes(indexes);
 ```
 
 Create an array of tuples from arrays of identical shape:
@@ -110,7 +110,7 @@ auto B = nd::ones(10, 10, 5) | nd::concat(nd::zeros(10, 10, 3)).on_axis(2);
 
 Take the cartesian product of a sequence of arrays:
 ```C++
-auto X = nd::cartesian_product(x, y, z); // X(i, j, k) == std::make_tuple(x(i), y(i), z(k))
+auto X = nd::cartesian_product(x, y, z); // X(i, j, k) == std::make_tuple(x(i), y(j), z(k))
 ```
 
 
