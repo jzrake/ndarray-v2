@@ -1186,7 +1186,7 @@ public:
         {
             throw std::logic_error("cannot reduce axis greater than or equal to array rank");
         }
-        constexpr std::size_t R = rank(array);
+        constexpr std::size_t R = ArrayType::rank;
 
         auto mapping = [the_operator=the_operator, axis_to_reduce=axis_to_reduce, array] (auto&& index)
         {

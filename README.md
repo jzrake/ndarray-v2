@@ -18,6 +18,7 @@ An array is a class template parameterized around a _provider_. Operations appli
 - Uses C++17 features (make sure to set `-std=c++17`)
 - Tested (so far) on:
     - clang 10.0.1
+    - gcc 7.3.0
     - gcc 8.2.0
 
 
