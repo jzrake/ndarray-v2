@@ -271,8 +271,8 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
 
 TEST_CASE("can zip arrays together", "[zip_arrays]")
 {
-    auto A = nd::shared_array<double>(10, 10);
-    auto B = nd::shared_array<int>(10, 10);
+    auto A = nd::make_shared_array<double>(10, 10);
+    auto B = nd::make_shared_array<int>(10, 10);
     auto AB = nd::zip_arrays(A, B);
     REQUIRE(AB(0, 0) == std::make_tuple(0.0, 0));
 }
@@ -408,7 +408,7 @@ TEST_CASE("transform operator works as expected", "[transform]")
     }
     SECTION("with shared provider")
     {
-        auto B1 = nd::shared_array<double>(10);
+        auto B1 = nd::make_shared_array<double>(10);
         auto B2 = B1 | nd::transform([] (auto) { return 2.0; });
 
         for (auto index : B2.indexes())
@@ -418,7 +418,7 @@ TEST_CASE("transform operator works as expected", "[transform]")
     }
     SECTION("with unique provider")
     {
-        auto C1 = nd::unique_array<double>(10);
+        auto C1 = nd::make_unique_array<double>(10);
         auto C2 = C1.shared() | nd::transform([] (auto) { return 2.0; });
 
         for (auto index : C2.indexes())
@@ -444,7 +444,7 @@ TEST_CASE("select operator works as expected", "[select]")
     }
     SECTION("with shared array")
     {
-        auto A1 = nd::unique_array<double>(10, 10);
+        auto A1 = nd::make_unique_array<double>(10, 10);
         auto A2 = A1.shared() | nd::select(nd::make_access_pattern(5, 5));
         A1(0, 0) = 1.0;
         REQUIRE(A1(0, 0) == 1.0);

@@ -92,10 +92,10 @@ namespace nd
     //=========================================================================
     template<typename Provider> auto make_array(Provider&&);
     template<typename Mapping, std::size_t Rank> auto make_array(Mapping mapping, shape_t<Rank> shape);
-    template<typename ValueType, std::size_t Rank> auto shared_array(shape_t<Rank> shape);
-    template<typename ValueType, typename... Args> auto shared_array(Args... args);
-    template<typename ValueType, std::size_t Rank> auto unique_array(shape_t<Rank> shape);
-    template<typename ValueType, typename... Args> auto unique_array(Args... args);
+    template<typename ValueType, std::size_t Rank> auto make_shared_array(shape_t<Rank> shape);
+    template<typename ValueType, typename... Args> auto make_shared_array(Args... args);
+    template<typename ValueType, std::size_t Rank> auto make_unique_array(shape_t<Rank> shape);
+    template<typename ValueType, typename... Args> auto make_unique_array(Args... args);
     template<std::size_t Rank> auto index_array(shape_t<Rank> shape);
     template<typename... Args> auto index_array(Args... args);
     template<typename... ArrayTypes> auto zip_arrays(ArrayTypes... arrays);
@@ -149,6 +149,15 @@ namespace nd
     //=========================================================================
     template<typename ArrayType> using value_type_of = typename std::remove_reference_t<ArrayType>::value_type;
     template<typename ArrayType> constexpr std::size_t rank(ArrayType&&) { return std::remove_reference_t<ArrayType>::rank; }
+
+
+    // convenience typedef's
+    //=========================================================================
+    template<typename ValueType, std::size_t Rank>
+    using shared_array = array_t<shared_provider_t<Rank, ValueType>>;
+
+    template<typename ValueType, std::size_t Rank>
+    using unique_array = array_t<unique_provider_t<Rank, ValueType>>;
 
 
     // algorithm support structs
@@ -1356,6 +1365,7 @@ public:
     auto shape() const { return the_shape; }
     auto size() const { return the_shape.volume(); }
     const ValueType* data() const { return buffer.data(); }
+    ValueType* data() { return buffer.data(); }
 
     auto shared() const & { return shared_provider_t(the_shape, std::make_shared<buffer_t<ValueType>>(buffer.begin(), buffer.end())); }
     auto shared()      && { return shared_provider_t(the_shape, std::make_shared<buffer_t<ValueType>>(std::move(buffer))); }
@@ -1617,13 +1627,13 @@ auto nd::make_array(Mapping mapping, shape_t<Rank> shape)
  * @return     The array
  */
 template<typename ValueType, std::size_t Rank>
-auto nd::shared_array(shape_t<Rank> shape)
+auto nd::make_shared_array(shape_t<Rank> shape)
 {
     return make_array(make_shared_provider<ValueType>(shape));
 }
 
 template<typename ValueType, typename... Args>
-auto nd::shared_array(Args... args)
+auto nd::make_shared_array(Args... args)
 {
     return make_array(make_shared_provider<ValueType>(args...));
 }
@@ -1643,13 +1653,13 @@ auto nd::shared_array(Args... args)
  * @return     The array
  */
 template<typename ValueType, std::size_t Rank>
-auto nd::unique_array(shape_t<Rank> shape)
+auto nd::make_unique_array(shape_t<Rank> shape)
 {
     return make_array(make_unique_provider<ValueType>(shape));
 }
 
 template<typename ValueType, typename... Args>
-auto nd::unique_array(Args... args)
+auto nd::make_unique_array(Args... args)
 {
     return make_array(make_unique_provider<ValueType>(args...));
 }
@@ -1933,6 +1943,12 @@ auto nd::sum()
 
 
 
+/**
+ * @brief      Return a reduce operator that returns true if all of its
+ *             argument array's elements evaluate to true.
+ *
+ * @return     The operator
+ */
 auto nd::all()
 {
     return [] (auto&& array)
@@ -1942,6 +1958,15 @@ auto nd::all()
     };
 }
 
+
+
+
+/**
+ * @brief      Return a reduce operator that returns true if any of its
+ *             argument array's elements evaluate to true.
+ *
+ * @return     The operator
+ */
 auto nd::any()
 {
     return [] (auto&& array)
@@ -2241,7 +2266,7 @@ template<typename ArrayType>
 auto nd::where(ArrayType array)
 {
     auto bool_array = array | transform([] (auto x) { return bool(x); });
-    auto index_list = unique_array<index_t<rank(bool_array)>>(bool_array | sum());
+    auto index_list = make_unique_array<index_t<rank(bool_array)>>(bool_array | sum());
 
     std::size_t n = 0;
 

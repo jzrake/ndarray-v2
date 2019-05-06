@@ -120,7 +120,7 @@ For most use cases, you should be able to create the array you need by composing
 There are two ways to create a unique array: from scratch,
 
 ```C++
-auto A = nd::unique_array(10, 20);
+auto A = nd::make_unique_array<double>(10, 20);
 ```
 
 or from an existing array,
