@@ -50,7 +50,7 @@ namespace nd
     template<std::size_t Rank> class jumps_t;
     template<std::size_t Rank> class memory_strides_t;
     template<std::size_t Rank> class access_pattern_t;
-    template<std::size_t Rank, typename Provider> class array_t;
+    template<typename Provider> class array_t;
     template<typename ValueType> class buffer_t;
 
 
@@ -1589,7 +1589,7 @@ auto nd::evaluate_as_shared(Provider&& provider)
 template<typename Provider>
 auto nd::make_array(Provider&& provider)
 {
-    return array_t<Provider::rank, Provider>(std::forward<Provider>(provider));
+    return array_t<Provider>(std::forward<Provider>(provider));
 }
 
 
@@ -2272,14 +2272,14 @@ auto nd::where(ArrayType array)
  * @tparam     Provider  Type defining the index space and mapping from indexes
  *                       to values
  */
-template<std::size_t Rank, typename Provider>
+template<typename Provider>
 class nd::array_t
 {
 public:
 
     using provider_type = Provider;
     using value_type = typename Provider::value_type;
-    static constexpr std::size_t rank = Rank;
+    static constexpr std::size_t rank = Provider::rank;
 
     //=========================================================================
     array_t(Provider&& provider) : provider(std::move(provider)) {}
@@ -2288,8 +2288,8 @@ public:
     //=========================================================================
     template<typename... Args> decltype(auto) operator()(Args... args) const { return provider(make_index(args...)); }
     template<typename... Args> decltype(auto) operator()(Args... args)       { return provider(make_index(args...)); }
-    decltype(auto) operator()(const index_t<Rank>& index) const { return provider(index); }
-    decltype(auto) operator()(const index_t<Rank>& index)       { return provider(index); }
+    decltype(auto) operator()(const index_t<rank>& index) const { return provider(index); }
+    decltype(auto) operator()(const index_t<rank>& index)       { return provider(index); }
     decltype(auto) data() const { return provider.data(); }
     decltype(auto) data()       { return provider.data(); }
 
@@ -2298,7 +2298,6 @@ public:
     auto shape() const { return provider.shape(); }
     auto shape(std::size_t axis) const { return provider.shape()[axis]; }
     auto size() const { return provider.size(); }
-    constexpr std::size_t get_rank() { return Rank; }
     const Provider& get_provider() const { return provider; }
     auto indexes() const { return make_access_pattern(provider.shape()); }
     template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
