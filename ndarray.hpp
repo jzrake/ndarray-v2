@@ -30,6 +30,7 @@
 #include <functional>        // std::ref
 #include <initializer_list>  // std::initializer_list
 #include <iterator>          // std::distance
+#include <memory>            // std::shared_ptr
 #include <numeric>           // std::accumulate
 #include <utility>           // std::index_sequence
 
@@ -267,7 +268,7 @@ public:
     struct iterator
     {
         using iterator_category = std::input_iterator_tag;
-        using value_type = value_type;
+        using value_type = zipped_container_t::value_type;
         using difference_type = std::ptrdiff_t;
         using pointer = value_type*;
         using reference = value_type&;
@@ -325,7 +326,7 @@ public:
     struct iterator
     {
         using iterator_category = std::input_iterator_tag;
-        using value_type = value_type;
+        using value_type = transformed_container_t::value_type;
         using difference_type = std::ptrdiff_t;
         using pointer = value_type*;
         using reference = value_type&;
@@ -2239,7 +2240,7 @@ auto nd::binary_op(Function function)
         };
         return make_array(mapping, A.shape());
     };
-};
+}
 
 
 
