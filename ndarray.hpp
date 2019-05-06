@@ -120,15 +120,15 @@ namespace nd
 
     // array operator factory functions
     //=========================================================================
-    auto to_shared();
-    auto to_unique();
-    auto bounds_check();
-    auto sum();
-    auto all();
-    auto any();
-    auto shift_by(int delta);
-    auto select_axis(std::size_t axis_to_select);
-    auto freeze_axis(std::size_t axis_to_freeze);
+    inline auto to_shared();
+    inline auto to_unique();
+    inline auto bounds_check();
+    inline auto sum();
+    inline auto all();
+    inline auto any();
+    inline auto shift_by(int delta);
+    inline auto select_axis(std::size_t axis_to_select);
+    inline auto freeze_axis(std::size_t axis_to_freeze);
     template<typename OperatorType> auto collect(OperatorType reduction);
     template<typename ArrayType> auto concat(ArrayType array_to_concat);
     template<typename ArrayType> auto read_indexes(ArrayType array_of_indexes);
