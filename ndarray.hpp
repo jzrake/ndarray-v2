@@ -1302,6 +1302,7 @@ public:
     static constexpr std::size_t rank = Rank;
 
     //=========================================================================
+    shared_provider_t() {}
     shared_provider_t(nd::shape_t<Rank> the_shape, std::shared_ptr<nd::buffer_t<ValueType>> buffer)
     : the_shape(the_shape)
     , strides(make_strides_row_major(the_shape))
@@ -2320,6 +2321,7 @@ public:
     static constexpr std::size_t rank = Provider::rank;
 
     //=========================================================================
+    array_t() {}
     array_t(Provider&& provider) : provider(std::move(provider)) {}
 
     // indexing functions
