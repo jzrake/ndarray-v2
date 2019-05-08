@@ -19,6 +19,7 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
+
  ==============================================================================
 */
 
@@ -1282,11 +1283,6 @@ public:
     auto shape() const { return the_shape; }
     auto size() const { return the_shape.volume(); }
 
-    template<std::size_t R> auto reshape(shape_t<R>) const
-    {
-        throw std::logic_error("array provider cannot be reshaped");
-    }
-
 private:
     //=========================================================================
     Function mapping;
@@ -1589,7 +1585,7 @@ auto nd::evaluate_as_shared(Provider&& provider)
 
 
 /**
- * @brief      Makes an array from the given provider.
+ * @brief      Make an array from the given provider.
  *
  * @param      provider  The provider
  *
@@ -1606,6 +1602,23 @@ auto nd::make_array(Provider&& provider)
 
 
 
+/**
+ * @brief      Make an array from the given index -> value mapping and shape.
+ *
+ * @param[in]  mapping  The mapping
+ * @param[in]  shape    The shape
+ *
+ * @tparam     Mapping  The type of the index -> value mapping
+ * @tparam     Rank     The rank of the array
+ *
+ * @return     The array
+ *
+ * @note       The array uses the `basic_provider_t`, whose `operator()` is a
+ *             const method, but which preserves the reference type of the
+ *             mapping's return value. That is, if `mapping` returns a const
+ *             reference then so does the returned array when indexed. The
+ *             returned array has no `data` or `reshape` methods, and whose.
+ */
 template<typename Mapping, std::size_t Rank>
 auto nd::make_array(Mapping mapping, shape_t<Rank> shape)
 {
@@ -1616,9 +1629,8 @@ auto nd::make_array(Mapping mapping, shape_t<Rank> shape)
 
 
 /**
- * @brief      Makes a shared (immutable, copyable, memory-backed) array with
- *             the given shape, initialized to the default-constructed
- *             ValueType.
+ * @brief      Make a shared (immutable, copyable, memory-backed) array with the
+ *             given shape, initialized to the default-constructed ValueType.
  *
  * @param[in]  shape      The shape
  *
@@ -1643,7 +1655,7 @@ auto nd::make_shared_array(Args... args)
 
 
 /**
- * @brief      Makes a unique (mutable, non-copyable, memory-backed) array with
+ * @brief      Make a unique (mutable, non-copyable, memory-backed) array with
  *             the given shape.
  *
  * @param[in]  shape      The shape
@@ -1669,7 +1681,7 @@ auto nd::make_unique_array(Args... args)
 
 
 /**
- * @brief      Returns an index-array of the given shape, mapping the index (i,
+ * @brief      Return an index-array of the given shape, mapping the index (i,
  *             j, ...) to itself.
  *
  * @param[in]  shape  The shape
@@ -1757,7 +1769,7 @@ auto nd::cartesian_product(ArrayTypes... arrays)
  *                        types
  * @tparam     Args       Argument types (should be a positive integral type)
  *
- * @return     An array of zeros, only requiring storage for a single element.
+ * @return     An array of zeros, only requiring storage for a single element
  */
 template<typename ValueType, typename... Args>
 auto nd::zeros(Args... args)
@@ -1857,10 +1869,10 @@ auto nd::reshape(Args... args)
 
 
 /**
- * @brief      Returns an operator that, applied to any array will yield a
+ * @brief      Return an operator that, applied to any array will yield a
  *             shared, memory-backed version of that array.
  *
- * @return     The operator.
+ * @return     The operator
  */
 auto nd::to_shared()
 {
@@ -1874,10 +1886,10 @@ auto nd::to_shared()
 
 
 /**
- * @brief      Returns an operator that, applied to any array will yield a
+ * @brief      Return an operator that, applied to any array will yield a
  *             unique, memory-backed version of that array.
  *
- * @return     The operator.
+ * @return     The operator
  */
 auto nd::to_unique()
 {
@@ -2076,9 +2088,9 @@ auto nd::read_indexes(ArrayType array_of_indexes)
  *
  * @param[in]  region_to_select  The region to select
  *
- * @tparam     Rank              Rank of the both the source and target arrays
+ * @tparam     Rank              Rank of both the source and target arrays
  *
- * @return     The operator.
+ * @return     The operator
  */
 template<std::size_t Rank>
 auto nd::select(access_pattern_t<Rank> region_to_select)
@@ -2117,7 +2129,7 @@ auto nd::replace(access_pattern_t<Rank> region_to_replace, ArrayType replacement
 
 
 /**
- * @brief      Return a select operator starting at the begin index.
+ * @brief      Return a select operator starting at the given index.
  *
  * @param[in]  starting_index  The starting index
  *
