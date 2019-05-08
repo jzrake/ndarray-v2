@@ -530,22 +530,18 @@ public:
 
     short_sequence_t(std::initializer_list<ValueType> args)
     {
+        if (args.size() != Rank)
+        {
+            throw std::logic_error("sequence constructed from initializer list of wrong size");
+        }
         for (const auto& [n, a] : enumerate(args))
         {
             memory[n] = a;
         }
     }
 
-    bool operator==(const DerivedType& other) const
-    {
-        return all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) == std::get<1>(t); });
-    }
-
-    bool operator!=(const DerivedType& other) const
-    {
-        return any_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) != std::get<1>(t); });
-    }
-
+    bool operator==(const DerivedType& other) const { return all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) == std::get<1>(t); }); }
+    bool operator!=(const DerivedType& other) const { return any_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) != std::get<1>(t); }); }
     constexpr std::size_t size() const { return Rank; }
     const ValueType* data() const { return memory; }
     const ValueType* begin() const { return memory; }
@@ -555,6 +551,18 @@ public:
     ValueType* begin() { return memory; }
     ValueType* end() { return memory + Rank; }
     ValueType& operator[](std::size_t n) { return memory[n]; }
+
+    template<typename Function>
+    auto transform(Function&& fn) const
+    {
+        DerivedType result;
+
+        for (auto n : range(Rank))
+        {
+            result[n] = fn(memory[n]);
+        }
+        return result;
+    }
 
 private:
     //=========================================================================
@@ -1772,7 +1780,7 @@ auto nd::make_unique_array(Args... args)
 template<std::size_t Rank>
 auto nd::index_array(shape_t<Rank> shape)
 {
-    auto mapping = [shape] (auto&& index) { return index; };
+    auto mapping = [] (auto&& index) { return index; };
     return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, shape));
 }
 
