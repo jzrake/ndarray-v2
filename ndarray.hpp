@@ -143,7 +143,7 @@ namespace nd
     template<typename... Args> auto replace_from(Args... args);
     template<std::size_t Rank> auto read_index(index_t<Rank>);
     template<typename... Args> auto read_index(Args... args);
-    template<typename Function> auto transform(Function function);
+    template<typename Function> auto map(Function function);
     template<typename Function> auto binary_op(Function function);
 
 
@@ -177,6 +177,7 @@ namespace nd
     template<typename Range> auto distance(Range&& rng);
     template<typename Range> auto enumerate(Range&& rng);
     template<typename ValueType> auto range(ValueType count);
+    template<typename Function> auto transform(Function fn);
     template<typename... ContainerTypes> auto zip(ContainerTypes&&... containers);
 
 
@@ -240,12 +241,7 @@ public:
     range_container_t(ValueType start, ValueType final) : start(start), final(final) {}
     iterator begin() const { return { 0, start, final }; }
     iterator end() const { return { final, start, final }; }
-
-    template<typename Function>
-    auto operator|(Function&& fn) const
-    {
-        return transformed_container_t<range_container_t, Function>(*this, fn);
-    }
+    template<typename Function> auto operator|(Function&& fn) const { return fn(*this); }
 
 private:
     //=========================================================================
@@ -300,12 +296,7 @@ public:
         auto res = detail::transform_tuple([] (const auto& x) { return std::end(x); }, containers);
         return iterator<decltype(res)>{res};
     }
-
-    template<typename Function>
-    auto operator|(Function&& fn) const
-    {
-        return transformed_container_t<zipped_container_t, Function>(*this, fn);
-    }
+    template<typename Function> auto operator|(Function&& fn) const { return fn(*this); }
 
 private:
     //=========================================================================
@@ -401,6 +392,15 @@ auto nd::zip(ContainerTypes&&... containers)
     using ValueType = std::tuple<typename std::remove_reference_t<ContainerTypes>::value_type...>;
     using ContainerTuple = std::tuple<ContainerTypes...>;
     return nd::zipped_container_t<ValueType, ContainerTuple>(std::forward_as_tuple(containers...));
+}
+
+template<typename Function>
+auto nd::transform(Function fn)
+{
+    return [fn] (auto container)
+    {
+        return transformed_container_t<decltype(container), Function>(container, fn);
+    };
 }
 
 
@@ -638,7 +638,7 @@ public:
     std::size_t compute_offset(const index_t<Rank>& index) const
     {
         auto mul_tuple = [] (auto t) { return std::get<0>(t) * std::get<1>(t); };
-        return accumulate(zip(index, *this) | mul_tuple, 0, std::plus<>());
+        return accumulate(zip(index, *this) | transform(mul_tuple), 0, std::plus<>());
     }
 
     template<typename... Args>
@@ -2206,17 +2206,19 @@ auto nd::read_index(Args... args)
 
 
 /**
- * @brief      Return an operator that transforms the values of an array using
- *             the given function object.
+ * @brief      Return an operator that maps the values of an array using the
+ *             given function object.
  *
  * @param      function  The function
  *
  * @tparam     Function  The type of the function object
  *
  * @return     The operator
+ * 
+ * @note       This is the N-dimensional version of the transform operator
  */
 template<typename Function>
-auto nd::transform(Function function)
+auto nd::map(Function function)
 {
     return [function] (auto array)
     {
@@ -2279,7 +2281,7 @@ auto nd::binary_op(Function function)
 template<typename ArrayType>
 auto nd::where(ArrayType array)
 {
-    auto bool_array = array | transform([] (auto x) { return bool(x); });
+    auto bool_array = array | map([] (auto x) { return bool(x); });
     auto index_list = make_unique_array<index_t<rank(bool_array)>>(bool_array | sum());
 
     std::size_t n = 0;

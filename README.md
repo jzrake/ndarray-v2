@@ -47,7 +47,7 @@ auto B = A.reshape(200); // may require B.size() == A.size() (see section on res
 
 Transform an array element-wise:
 ```C++
-auto B = A | nd::transform([] (auto x) { return x * x; });
+auto B = A | nd::map([] (auto x) { return x * x; });
 ```
 
 Create an array as a subset of another:
@@ -175,15 +175,15 @@ The ability to reshape an array depends on the provider type. Memory-backed arra
 
 
 ## Writing new operators
-Here is an example of how to write a custom operator. As a use-case, let's say you'd like to transform an array `A` through a function `f`,
+Here is an example of how to write a custom operator. As a use-case, let's say you'd like to map an array `A` through a function `f`,
 ```C++
-auto B = A | nd::transform(f);
+auto B = A | nd::map(f);
 ```
 
 but `f` might throw an exception. We'll write an operator called `value_on_exception`, that catches the error and returns a value -1 as a default value:
 
 ```C++
-auto B = A | nd::transform(f) | value_on_exception(-1);
+auto B = A | nd::map(f) | value_on_exception(-1);
 ```
 
 Here is the code for the `value_on_exception` operator:
@@ -217,7 +217,7 @@ Arrays are not just objects for storing and retrieving data; they are types that
 ```C++
 auto the_algorithm(auto A, auto B)
 {
-    return ((A | transform(sqrt)) + B | some_operator)
+    return ((A | map(sqrt)) + B | some_operator)
     | collect(standard_deviation()).along_axis(1)
     | to_shared();
 }
@@ -226,7 +226,7 @@ This evaluation is _embarressingly parallel_ as a result of the immutability: ea
 ```C++
 auto the_algorithm(auto A, auto B)
 {
-    return ((A | transform(sqrt)) + B | some_operator)
+    return ((A | map(sqrt)) + B | some_operator)
     | collect(standard_deviation()).along_axis(1)
     | evaluate_on<4>();
 }

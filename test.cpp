@@ -35,7 +35,7 @@ TEST_CASE("can zip, transform, enumerate a range", "[range] [transform] [zip]")
 {
     auto n = 0;
 
-    for (auto a : nd::range(10) | [] (auto a) { return 2 * a; })
+    for (auto a : nd::range(10) | nd::transform([] (auto a) { return 2 * a; }))
     {
         REQUIRE(a == 2 * n);
         ++n;
@@ -394,12 +394,12 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
 }
 
-TEST_CASE("transform operator works as expected", "[transform]")
+TEST_CASE("map operator works as expected", "[map]")
 {
     SECTION("with index provider")
     {
         auto A1 = nd::index_array(10);
-        auto A2 = A1 | nd::transform([] (auto i) { return i[0] * 2.0; });
+        auto A2 = A1 | nd::map([] (auto i) { return i[0] * 2.0; });
 
         for (auto index : A2.indexes())
         {
@@ -409,7 +409,7 @@ TEST_CASE("transform operator works as expected", "[transform]")
     SECTION("with shared provider")
     {
         auto B1 = nd::make_shared_array<double>(10);
-        auto B2 = B1 | nd::transform([] (auto) { return 2.0; });
+        auto B2 = B1 | nd::map([] (auto) { return 2.0; });
 
         for (auto index : B2.indexes())
         {
@@ -419,7 +419,7 @@ TEST_CASE("transform operator works as expected", "[transform]")
     SECTION("with unique provider")
     {
         auto C1 = nd::make_unique_array<double>(10);
-        auto C2 = C1.shared() | nd::transform([] (auto) { return 2.0; });
+        auto C2 = C1.shared() | nd::map([] (auto) { return 2.0; });
 
         for (auto index : C2.indexes())
         {
@@ -504,7 +504,7 @@ TEST_CASE("can read an index from an array", "[read_index]")
 TEST_CASE("can sum an array", "[sum]")
 {
     using namespace nd;
-    REQUIRE((index_array(3) | transform([] (auto i) { return i[0]; }) | sum()) == 3);
+    REQUIRE((index_array(3) | map([] (auto i) { return i[0]; }) | sum()) == 3);
     REQUIRE((ones(10, 10) | sum()) == 100);
 }
 
@@ -519,7 +519,7 @@ TEST_CASE("can test for equality", "[sum] [any] [all]")
 
 TEST_CASE("can get an index array using where, and pass that to read_indexes", "[where] [read_indexes]")
 {
-    auto A = nd::index_array(10) | nd::transform([] (auto i) { return i[0]; });
+    auto A = nd::index_array(10) | nd::map([] (auto i) { return i[0]; });
     REQUIRE(nd::where(A < 5).size() == 5);
     REQUIRE(bool(((A | nd::read_indexes(nd::where(A < 5))) < 5) | nd::all()));
 }
