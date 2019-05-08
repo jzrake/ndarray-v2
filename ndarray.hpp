@@ -46,12 +46,12 @@ namespace nd
     // array support structs
     //=========================================================================
     template<std::size_t Rank, typename ValueType, typename DerivedType> class short_sequence_t;
-    template<std::size_t Rank, typename ValueType> class basic_sequence_t;
     template<std::size_t Rank> class shape_t;
     template<std::size_t Rank> class index_t;
     template<std::size_t Rank> class jumps_t;
     template<std::size_t Rank> class memory_strides_t;
     template<std::size_t Rank> class access_pattern_t;
+    template<typename ValueType, std::size_t Rank> class basic_sequence_t;
     template<typename Provider> class array_t;
     template<typename ValueType> class buffer_t;
 
@@ -337,17 +337,18 @@ public:
     };
 
     //=========================================================================
-    transformed_container_t(const ContainerType& container, const Function& function)
+    transformed_container_t(ContainerType container, Function function)
     : container(container)
     , function(function) {}
 
+    auto size() const { return container.size(); }
     auto begin() const { return iterator<decltype(container.begin())> {container.begin(), function}; }
     auto end() const { return iterator<decltype(container.end())> {container.end(), function}; }
 
 private:
     //=========================================================================
-    const ContainerType& container;
-    const Function& function;
+    ContainerType container;
+    Function function;
 };
 
 
@@ -564,8 +565,8 @@ private:
 
 
 //=============================================================================
-template<std::size_t Size, typename ValueType>
-class nd::basic_sequence_t : public nd::short_sequence_t<Size, ValueType, basic_sequence_t<Size, ValueType>>
+template<typename ValueType, std::size_t Size>
+class nd::basic_sequence_t : public nd::short_sequence_t<Size, ValueType, basic_sequence_t<ValueType, Size>>
 {
 };
 
@@ -993,7 +994,7 @@ auto nd::partition_shape(shape_t<Rank> shape)
 {
     // Note: this function should handle remainders better
     constexpr std::size_t D = 0;
-    auto result = basic_sequence_t<NumPartitions, access_pattern_t<Rank>>();
+    auto result = basic_sequence_t<access_pattern_t<Rank>, NumPartitions>();
     auto chunk_size = shape[D] / NumPartitions;
 
     for (std::size_t n = 0; n < NumPartitions; ++n)

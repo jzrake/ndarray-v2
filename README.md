@@ -252,7 +252,7 @@ auto evaluate_on()
                 }
             };
         };
-        auto threads = nd::basic_sequence_t<NumThreads, std::thread>();
+        auto threads = nd::basic_sequence_t<std::thread, NumThreads>();
         auto regions = nd::partition_shape<NumThreads>(array.shape());
 
         for (auto [n, accessor] : nd::enumerate(regions))
