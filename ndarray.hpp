@@ -167,6 +167,7 @@ namespace nd
     template<typename ValueType> class range_container_t;
     template<typename ValueType, typename ContainerTuple> class zipped_container_t;
     template<typename ContainerType, typename Function> class transformed_container_t;
+    template<typename ContainerType> class divvy_container_t;
 
 
     // std::algorithm wrappers for ranges
@@ -179,6 +180,7 @@ namespace nd
     template<typename ValueType> auto range(ValueType count);
     template<typename Function> auto transform(Function fn);
     template<typename... ContainerTypes> auto zip(ContainerTypes&&... containers);
+    inline auto divvy(std::size_t num_groups);
 
 
     // helper functions
@@ -229,6 +231,7 @@ public:
         using reference = value_type&;
 
         iterator& operator++() { ++current; return *this; }
+        iterator operator+(std::size_t difference) const { return { ValueType(current + difference), start, final }; }
         bool operator==(const iterator& other) const { return current == other.current; }
         bool operator!=(const iterator& other) const { return current != other.current; }
         const ValueType& operator*() const { return current; }
@@ -239,6 +242,7 @@ public:
 
     //=========================================================================
     range_container_t(ValueType start, ValueType final) : start(start), final(final) {}
+    std::size_t size() const { return final - start; }
     iterator begin() const { return { 0, start, final }; }
     iterator end() const { return { final, start, final }; }
     template<typename Function> auto operator|(Function&& fn) const { return fn(*this); }
@@ -288,7 +292,7 @@ public:
     auto begin() const
     {
         auto res = detail::transform_tuple([] (const auto& x) { return std::begin(x); }, containers);
-         return iterator<decltype(res)>{res};
+        return iterator<decltype(res)>{res};
     }
 
     auto end() const
@@ -350,6 +354,71 @@ private:
 
 
 //=============================================================================
+template<typename ContainerType>
+class nd::divvy_container_t
+{
+public:
+
+    //=============================================================================
+    template<typename IteratorType>
+    class divvy_group_t
+    {
+    public:
+        divvy_group_t() {}
+        divvy_group_t(IteratorType start, IteratorType final) : start(start), final(final) {}
+        std::size_t size() { return std::distance(start, final); }
+        auto begin() const { return start; }
+        auto end() const { return final; }
+    private:
+        IteratorType start;
+        IteratorType final;
+    };
+
+    using value_type = divvy_group_t<typename ContainerType::iterator>;
+
+    //=========================================================================
+    struct iterator
+    {
+        using iterator_category = std::input_iterator_tag;
+        using value_type = divvy_container_t::value_type;
+        using difference_type = std::ptrdiff_t;
+        using pointer = value_type*;
+        using reference = value_type&;
+
+        iterator& operator++() { ++current; return *this; }
+        bool operator==(const iterator& other) const { return current == other.current; }
+        bool operator!=(const iterator& other) const { return current != other.current; }
+        auto operator*() const
+        {
+            std::size_t start = current * container.size() / num_groups;
+            std::size_t final = current == num_groups - 1 ? container.size() : (current + 1) * container.size() / num_groups;
+            return divvy_group_t<decltype(container.begin())>(container.begin() + start, container.begin() + final);
+        }
+        std::size_t current;
+        std::size_t num_groups;
+        ContainerType container;
+    };
+
+    //=========================================================================
+    divvy_container_t(ContainerType container, std::size_t num_groups)
+    : container(container)
+    , num_groups(num_groups) {}
+    
+    std::size_t size() const { return num_groups; }
+    iterator begin() const { return { 0, num_groups, container }; }
+    iterator end() const { return { num_groups, num_groups, container }; }
+    template<typename Function> auto operator|(Function&& fn) const { return fn(*this); }
+
+private:
+    //=========================================================================
+    ContainerType container;
+    std::size_t num_groups;
+};
+
+
+
+
+//=============================================================================
 template<typename Range, typename Seed, typename Function>
 auto nd::accumulate(Range&& rng, Seed&& seed, Function&& fn)
 {
@@ -400,6 +469,14 @@ auto nd::transform(Function fn)
     return [fn] (auto container)
     {
         return transformed_container_t<decltype(container), Function>(container, fn);
+    };
+}
+
+auto nd::divvy(std::size_t num_groups)
+{
+    return [num_groups] (auto container)
+    {
+        return divvy_container_t<decltype(container)>(container, num_groups);
     };
 }
 
