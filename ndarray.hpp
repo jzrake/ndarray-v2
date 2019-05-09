@@ -106,6 +106,7 @@ namespace nd
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
     template<typename ValueType, std::size_t Rank> auto promote(ValueType, shape_t<Rank>);
+    inline auto linspace(double x0, double x1, std::size_t count);
 
 
     // array operator support structs
@@ -144,6 +145,7 @@ namespace nd
     template<std::size_t Rank> auto read_index(index_t<Rank>);
     template<typename... Args> auto read_index(Args... args);
     template<typename Function> auto map(Function function);
+    template<typename Function> auto apply(Function function);
     template<typename Function> auto binary_op(Function function);
 
 
@@ -170,7 +172,7 @@ namespace nd
     template<typename ContainerType> class divvy_container_t;
 
 
-    // std::algorithm wrappers for ranges
+    // std::algorithm wrappers for ranges, and some extras
     //=========================================================================
     template<typename Range, typename Seed, typename Function> auto accumulate(Range&& rng, Seed&& seed, Function&& fn);
     template<typename Range, typename Predicate> auto all_of(Range&& rng, Predicate&& pred);
@@ -1869,7 +1871,7 @@ auto nd::cartesian_product(ArrayTypes... arrays)
 template<typename ValueType, typename... Args>
 auto nd::zeros(Args... args)
 {
-    return make_array(nd::make_uniform_provider(ValueType(0), args...));
+    return make_array(make_uniform_provider(ValueType(0), args...));
 }
 
 
@@ -1889,7 +1891,7 @@ auto nd::zeros(Args... args)
 template<typename ValueType, typename... Args>
 auto nd::ones(Args... args)
 {
-    return make_array(nd::make_uniform_provider(ValueType(1), args...));
+    return make_array(make_uniform_provider(ValueType(1), args...));
 }
 
 
@@ -2325,6 +2327,29 @@ auto nd::map(Function function)
 
 
 /**
+ * @brief      Return an operator that calls std::apply(fn, arg) for each arg in
+ *             the operand array. The value type of that array must be some type
+ *             of std::tuple.
+ *
+ * @param[in]  fn        The function
+ *
+ * @tparam     Function  The type of the function object
+ *
+ * @return     The operator
+ */
+template<typename Function>
+auto nd::apply(Function fn)
+{
+    return [fn] (auto array)
+    {
+        return array | nd::map([fn] (auto args) { return std::apply(fn, args); });
+    };
+}
+
+
+
+
+/**
  * @brief      Return a function that operates on two arrays, given a function
  *             that operates on their value types.
  *
@@ -2349,45 +2374,6 @@ auto nd::binary_op(Function function)
         };
         return make_array(mapping, A.shape());
     };
-}
-
-
-
-
-//=============================================================================
-// More array factories, which must be defined after the operator factories
-//=============================================================================
-
-
-
-
-/**
- * @brief      Return a 1d array of containing the indexes where the given array
- *             evaluates to true
- *
- * @param      array      The array
- *
- * @tparam     ArrayType  The type of the argument array
- *
- * @return     An immutable, memory-backed 1d array of index_t<rank>, where rank
- *             is the rank of the argument array
- */
-template<typename ArrayType>
-auto nd::where(ArrayType array)
-{
-    auto bool_array = array | map([] (auto x) { return bool(x); });
-    auto index_list = make_unique_array<index_t<rank(bool_array)>>(bool_array | sum());
-
-    std::size_t n = 0;
-
-    for (auto index : bool_array.indexes())
-    {
-        if (bool_array(index))
-        {
-            index_list(n++) = index;
-        }
-    }
-    return index_list.shared();
 }
 
 
@@ -2474,6 +2460,67 @@ private:
     }
     Provider provider;
 };
+
+
+
+
+
+//=============================================================================
+// More array factories, which must be defined after the operator factories
+//=============================================================================
+
+
+
+
+/**
+ * @brief      Return a 1d array of containing the indexes where the given array
+ *             evaluates to true
+ *
+ * @param      array      The array
+ *
+ * @tparam     ArrayType  The type of the argument array
+ *
+ * @return     An immutable, memory-backed 1d array of index_t<rank>, where rank
+ *             is the rank of the argument array
+ */
+template<typename ArrayType>
+auto nd::where(ArrayType array)
+{
+    auto bool_array = array | map([] (auto x) { return bool(x); });
+    auto index_list = make_unique_array<index_t<rank(bool_array)>>(bool_array | sum());
+
+    std::size_t n = 0;
+
+    for (auto index : bool_array.indexes())
+    {
+        if (bool_array(index))
+        {
+            index_list(n++) = index;
+        }
+    }
+    return index_list.shared();
+}
+
+
+
+
+/**
+ * @brief      Return a 1d array of equally spaced values
+ *
+ * @param[in]  x0     The starting value
+ * @param[in]  x1     The final value (inclusive)
+ * @param[in]  count  The number of elements in the return array
+ *
+ * @return     The array
+ */
+auto nd::linspace(double x0, double x1, std::size_t count)
+{
+    auto mapping = [x0, x1, count] (auto index)
+    {
+        return x0 + (x1 - x0) * index[0] / (count - 1);
+    };
+    return make_array(mapping, make_shape(count));
+}
 
 
 
