@@ -1965,7 +1965,7 @@ auto nd::to_shared()
 {
     return [] (auto&& array)
     {
-        return make_array(evaluate_as_unique(array.get_provider()));
+        return make_array(evaluate_as_shared(array.get_provider()));
     };
 }
 
@@ -1982,7 +1982,7 @@ auto nd::to_unique()
 {
     return [] (auto&& array)
     {
-        return make_array(evaluate_as_shared(array.get_provider()));
+        return make_array(evaluate_as_unique(array.get_provider()));
     };
 }
 
