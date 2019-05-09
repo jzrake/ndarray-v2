@@ -207,6 +207,14 @@ namespace nd
 
         template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
         auto remove_elements(const SourceSequence& source, IndexContainer indexes);
+
+        template <typename... Ts> using void_t = void;
+
+        template <typename T, typename = void>
+        struct has_typedef_is_ndarray : std::false_type {};
+
+        template <typename T>
+        struct has_typedef_is_ndarray<T, void_t<typename T::is_ndarray>> : std::true_type {};
     }
 }
 
@@ -1901,13 +1909,13 @@ auto nd::ones(Args... args)
 template<typename Arg, std::size_t Rank>
 auto nd::promote(Arg arg, nd::shape_t<Rank> shape)
 {
-    if constexpr (std::is_arithmetic<Arg>::value)
+    if constexpr (detail::has_typedef_is_ndarray<Arg>::value)
     {
-        return make_array(make_uniform_provider(arg, shape));
+        return arg;
     }
     else
     {
-        return arg;
+        return make_array(make_uniform_provider(arg, shape));
     }
 }
 
@@ -2126,7 +2134,7 @@ auto nd::freeze_axis(std::size_t axis_to_freeze)
 template<typename OperatorType>
 auto nd::collect(OperatorType reduction)
 {
-    return axis_reducer_t<OperatorType>(0, std::forward<OperatorType>(reduction));
+    return axis_reducer_t<OperatorType>(0, reduction);
 }
 
 
@@ -2148,7 +2156,7 @@ auto nd::collect(OperatorType reduction)
 template<typename ArrayType>
 auto nd::concat(ArrayType array_to_concat)
 {
-    return concatenator_t<ArrayType>(0, std::forward<ArrayType>(array_to_concat));
+    return concatenator_t<ArrayType>(0, array_to_concat);
 }
 
 
@@ -2406,6 +2414,8 @@ public:
 
     using provider_type = Provider;
     using value_type = typename Provider::value_type;
+    using is_ndarray = std::true_type;
+
     static constexpr std::size_t rank = Provider::rank;
 
     //=========================================================================
