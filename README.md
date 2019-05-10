@@ -269,3 +269,9 @@ auto evaluate_on()
 The actual mileage you'll get out of this approach may vary with type of memory access patterns your arrays are using, and what type of calculations are being done. Typically, the more work you do per evaluation of `operator()`, the better.
 
 Note that reductions are also a parallelizable operation - as an excerise, try implementing a multi-threaded `reduce_on` operator!
+
+
+## TODO items
+- [ ] Add `array_t::iterator`
+- [ ] Write `flat` operator and `from_range` factory
+- [ ] Unify the approach to 1d ranges with the array/provider scheme

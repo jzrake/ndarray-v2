@@ -34,6 +34,7 @@
 #include <memory>            // std::shared_ptr
 #include <numeric>           // std::accumulate
 #include <utility>           // std::index_sequence
+#include <string>            // std::to_string
 
 
 
@@ -162,6 +163,13 @@ namespace nd
 
     template<typename ValueType, std::size_t Rank>
     using unique_array = array_t<unique_provider_t<Rank, ValueType>>;
+
+
+    // to_string overloads
+    //=========================================================================
+    template<std::size_t Rank> auto to_string(const index_t<Rank>& index);
+    template<std::size_t Rank> auto to_string(const shape_t<Rank>& index);
+    template<std::size_t Rank> auto to_string(const access_pattern_t<Rank>& region);
 
 
     // algorithm support structs
@@ -2520,6 +2528,46 @@ auto nd::linspace(double x0, double x1, std::size_t count)
         return x0 + (x1 - x0) * index[0] / (count - 1);
     };
     return make_array(mapping, make_shape(count));
+}
+
+
+
+
+//=============================================================================
+// to_string overloads
+//=============================================================================
+
+
+
+
+template<std::size_t Rank>
+auto nd::to_string(const nd::index_t<Rank>& index)
+{
+    auto result = std::string("[ ");
+
+    for (std::size_t axis = 0; axis < Rank; ++axis)
+    {
+        result += std::to_string(index[axis]) + " ";
+    }
+    return result + "]";
+}
+
+template<std::size_t Rank>
+auto nd::to_string(const nd::shape_t<Rank>& index)
+{
+    auto result = std::string("< ");
+
+    for (std::size_t axis = 0; axis < Rank; ++axis)
+    {
+        result += std::to_string(index[axis]) + " ";
+    }
+    return result + ">";
+}
+
+template<std::size_t Rank>
+auto nd::to_string(const nd::access_pattern_t<Rank>& region)
+{
+    return to_string(region.start) + " -> " + to_string(region.final);
 }
 
 
