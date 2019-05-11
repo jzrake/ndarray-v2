@@ -33,8 +33,8 @@
 #include <iterator>          // std::distance
 #include <memory>            // std::shared_ptr
 #include <numeric>           // std::accumulate
-#include <utility>           // std::index_sequence
 #include <string>            // std::to_string
+#include <utility>           // std::index_sequence
 
 
 
@@ -2454,8 +2454,8 @@ public:
     template<typename T> auto operator>=(T&& A) const { return bin_op(std::forward<T>(A), std::greater_equal<>()); }
     template<typename T> auto operator<(T&& A) const { return bin_op(std::forward<T>(A), std::less<>()); }
     template<typename T> auto operator>(T&& A) const { return bin_op(std::forward<T>(A), std::greater<>()); }
-    template<typename T> auto operator-() const { return transform(std::negate<>()); }
-    template<typename T> auto operator!() const { return transform(std::logical_not<>()); }
+    auto operator-() const { return *this | map(std::negate<>()); }
+    auto operator!() const { return *this | map(std::logical_not<>()); }
 
 private:
     //=========================================================================

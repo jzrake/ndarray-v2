@@ -520,9 +520,11 @@ TEST_CASE("binary operation works as expected")
     auto B = nd::ones<double>(10, 10);
     auto b = nd::ones<double>(10, 11);
     auto C = F(A, B);
+    auto D = -C;
     static_assert(std::is_same<decltype(C(0, 0)), double>::value);
 
     REQUIRE(C(0, 0) == 2.0);
+    REQUIRE(D(0, 0) ==-2.0);
     REQUIRE_THROWS(F(A, b));
     REQUIRE_THROWS((A + b)(0, 0));
 
