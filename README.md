@@ -273,5 +273,6 @@ Note that reductions are also a parallelizable operation - as an excerise, try i
 
 ## TODO items
 - [ ] Add `array_t::iterator`
+- [x] Add `nd::make_array_from` (iterable)
 - [ ] Write `flat` operator and `from_range` factory
 - [ ] Unify the approach to 1d ranges with the array/provider scheme

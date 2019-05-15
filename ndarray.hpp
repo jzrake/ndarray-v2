@@ -95,6 +95,7 @@ namespace nd
     //=========================================================================
     template<typename Provider> auto make_array(Provider&&);
     template<typename Mapping, std::size_t Rank> auto make_array(Mapping mapping, shape_t<Rank> shape);
+    template<typename ContainerType> auto make_array_from(const ContainerType& container);
     template<typename ValueType, std::size_t Rank> auto make_shared_array(shape_t<Rank> shape);
     template<typename ValueType, typename... Args> auto make_shared_array(Args... args);
     template<typename ValueType, std::size_t Rank> auto make_unique_array(shape_t<Rank> shape);
@@ -127,8 +128,11 @@ namespace nd
     inline auto to_unique();
     inline auto bounds_check();
     inline auto sum();
+    inline auto min();
+    inline auto max();
     inline auto all();
     inline auto any();
+    inline auto where();
     inline auto shift_by(int delta);
     inline auto select_axis(std::size_t axis_to_select);
     inline auto freeze_axis(std::size_t axis_to_freeze);
@@ -148,6 +152,8 @@ namespace nd
     template<typename Function> auto map(Function function);
     template<typename Function> auto apply(Function function);
     template<typename Function> auto binary_op(Function function);
+    template<typename ArrayType> auto min(ArrayType&& array);
+    template<typename ArrayType> auto max(ArrayType&& array);
 
 
     // array query support
@@ -1734,6 +1740,32 @@ auto nd::make_array(Mapping mapping, shape_t<Rank> shape)
 
 
 /**
+ * @brief      Create a 1-dimensional array from an iterable container
+ *
+ * @param[in]  container      The container to source values from
+ *
+ * @tparam     ContainerType  The type of the container, std::vector, std::list,
+ *                            std::array, etc.
+ *
+ * @return     The array
+ */
+template<typename ContainerType>
+auto nd::make_array_from(const ContainerType& container)
+{
+    auto shape = make_shape(container.size());
+    auto result = make_unique_array<typename ContainerType::value_type>(shape);
+
+    for (auto [n, source_value] : enumerate(container))
+    {
+        result(n) = source_value;
+    }
+    return std::move(result).shared();
+}
+
+
+
+
+/**
  * @brief      Make a shared (immutable, copyable, memory-backed) array with the
  *             given shape, initialized to the default-constructed ValueType.
  *
@@ -2060,6 +2092,45 @@ auto nd::sum()
 
 
 
+template<typename ArrayType>
+auto nd::min(ArrayType&& array)
+{
+    auto result = nd::value_type_of<ArrayType>();
+    auto first = true;
+
+    for (const auto& i : array.indexes())
+    {
+        if (first || array(i) < result)
+        {
+            result = array(i);
+        }
+        first = false;
+    }
+    return result;
+}
+
+template<typename ArrayType>
+auto nd::max(ArrayType&& array)
+{
+    auto result = nd::value_type_of<ArrayType>();
+    auto first = true;
+
+    for (const auto& i : array.indexes())
+    {
+        if (first || array(i) > result)
+        {
+            result = array(i);
+        }
+        first = false;
+    }
+    return result;
+}
+
+auto nd::min() { return [] (auto&& array) { return min(std::forward<decltype(array)>(array)); }; }
+auto nd::max() { return [] (auto&& array) { return max(std::forward<decltype(array)>(array)); }; }
+
+
+
 
 /**
  * @brief      Return a reduce operator that returns true if all of its
@@ -2091,6 +2162,24 @@ auto nd::any()
     {
         for (const auto& i : array.indexes()) if (array(i)) return true;
         return false;
+    };
+}
+
+
+
+
+/**
+ * @brief      Return an operator that applies where to an array
+ *
+ * @return     The operator
+ *
+ * @note       See nd::where(ArrayType)
+ */
+auto nd::where()
+{
+    return [] (auto array)
+    {
+        return nd::where(array);
     };
 }
 
