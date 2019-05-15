@@ -103,7 +103,9 @@ namespace nd
     template<std::size_t Rank> auto index_array(shape_t<Rank> shape);
     template<typename... Args> auto index_array(Args... args);
     template<typename... ArrayTypes> auto zip_arrays(ArrayTypes... arrays);
+    template<typename ArrayType> auto unzip_array(ArrayType array);
     template<typename... ArrayTypes> auto cartesian_product(ArrayTypes... arrays);
+    template<typename... ArrayTypes> auto meshgrid(ArrayTypes... arrays);
     template<typename ArrayType> auto where(ArrayType array);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
@@ -214,6 +216,9 @@ namespace nd
 
         template<typename FunctionTuple, typename ArgumentTuple>
         auto zip_apply_tuple(FunctionTuple&& fn, ArgumentTuple&& args);
+
+        template<typename ArrayType, std::size_t... Is>
+        auto unzip_array_impl(ArrayType array, std::index_sequence<Is...>);
 
         template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
         auto read_elements(const SourceSequence& source, IndexContainer indexes);
@@ -1873,6 +1878,25 @@ auto nd::zip_arrays(ArrayTypes... arrays)
 
 
 /**
+ * @brief      Turn an array of tuples into a tuple of arrays
+ *
+ * @param[in]  array      The array of tuples
+ *
+ * @tparam     ArrayType  The type of the argument array
+ *
+ * @return     The tuple of arrays
+ */
+template<typename ArrayType>
+auto nd::unzip_array(ArrayType array)
+{
+    auto Is = std::make_index_sequence<std::tuple_size<typename ArrayType::value_type>::value>();
+    return detail::unzip_array_impl(array, Is);
+}
+
+
+
+
+/**
  * @brief      Return an array that is the cartesian product of the argument
  *             arrays, A(i, j, k) == make_tuple(a(i), b(j), c(k))
  *
@@ -1892,6 +1916,24 @@ auto nd::cartesian_product(ArrayTypes... arrays)
         return detail::zip_apply_tuple(std::forward_as_tuple(arrays...), index.as_tuple());
     };
     return make_array(mapping, shape);
+}
+
+
+
+
+/**
+ * @brief      Return a tuple of N-dimensional arrays, given N 1d arrays
+ *
+ * @param[in]  arrays      The arrays
+ *
+ * @tparam     ArrayTypes  The types of the input arrays
+ *
+ * @return     The tuple of arrays
+ */
+template<typename... ArrayTypes>
+auto nd::meshgrid(ArrayTypes... arrays)
+{
+    return unzip_array(cartesian_product(arrays...));
 }
 
 
@@ -2694,6 +2736,12 @@ auto nd::detail::zip_apply_tuple(FunctionTuple&& fn, ArgumentTuple&& args)
         std::forward<FunctionTuple>(fn),
         std::forward<ArgumentTuple>(args),
         std::make_index_sequence<std::tuple_size<ArgumentTuple>::value>());
+}
+
+template<typename ArrayType, std::size_t... Is>
+auto nd::detail::unzip_array_impl(ArrayType array, std::index_sequence<Is...>)
+{
+    return std::make_tuple(array | nd::map([] (auto v) { return std::get<Is>(v); })...);
 }
 
 template<typename ResultSequence, typename SourceSequence, typename IndexContainer>
