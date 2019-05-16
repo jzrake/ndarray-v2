@@ -105,19 +105,29 @@ Read the values from an array at those indexes:
 auto values = D | nd::read_indexes(indexes);
 ```
 
-Create an array of tuples from arrays of identical shape:
-```C++
-auto ABC = nd::zip_arrays(A, B, C); // ABC(0, 0) is a std::tuple
-```
-
 Concatenate another array:
 ```C++
 auto B = nd::ones(10, 10, 5) | nd::concat(nd::zeros(10, 10, 3)).on_axis(2);
 ```
 
+Create an array of tuples from arrays of identical shape:
+```C++
+auto ABC = nd::zip_arrays(A, B, C); // ABC(0, 0) is a std::tuple
+```
+
+Create a tuple of arrays from an array of tuples:
+```C++
+auto [A, B, C] = nd::unzip_arrays(ABC);
+```
+
 Take the cartesian product of a sequence of arrays:
 ```C++
 auto X = nd::cartesian_product(x, y, z); // X(i, j, k) == std::make_tuple(x(i), y(j), z(k))
+```
+
+Create N, N-dimensional arrys from N 1d arrays:
+```C++
+auto [X, Y] = nd::meshgrid(x, y); // X.shape() == Y.shape() == {x.size(), y.size()}
 ```
 
 
