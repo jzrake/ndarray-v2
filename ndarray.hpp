@@ -420,8 +420,8 @@ public:
         bool operator!=(const iterator& other) const { return current != other.current; }
         auto operator*() const
         {
-            std::size_t start = current * container.size() / num_groups;
-            std::size_t final = current == num_groups - 1 ? container.size() : (current + 1) * container.size() / num_groups;
+            std::size_t start = (current + 0) * container.size() / num_groups;
+            std::size_t final = (current + 1) * container.size() / num_groups;
             return divvy_group_t<decltype(container.begin())>(container.begin() + start, container.begin() + final);
         }
         std::size_t current;
@@ -1029,17 +1029,15 @@ auto nd::make_access_pattern(Args... args)
 template<std::size_t NumPartitions, std::size_t Rank>
 auto nd::partition_shape(shape_t<Rank> shape)
 {
-    // Note: this function should handle remainders better
-    constexpr std::size_t D = 0;
+    constexpr std::size_t distributed_axis = 0;
     auto result = basic_sequence_t<access_pattern_t<Rank>, NumPartitions>();
-    auto chunk_size = shape[D] / NumPartitions;
 
     for (std::size_t n = 0; n < NumPartitions; ++n)
     {
-        auto pattern = make_access_pattern(shape);
-        pattern.start[D] = chunk_size * n;
-        pattern.final[D] = n == NumPartitions - 1 ? shape[D] : chunk_size * (n + 1);
-        result[n] = pattern;
+        auto p = make_access_pattern(shape);
+        p.start[distributed_axis] = (n + 0) * shape[distributed_axis] / NumPartitions;
+        p.final[distributed_axis] = (n + 1) * shape[distributed_axis] / NumPartitions;
+        result[n] = p;
     }
     return result;
 }

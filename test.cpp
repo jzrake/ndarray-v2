@@ -63,6 +63,7 @@ TEST_CASE("can zip, transform, enumerate a range", "[range] [transform] [zip] [d
             ++n;
         }
     }
+    REQUIRE(n == 20);
 
     n = 0;
 
@@ -74,6 +75,7 @@ TEST_CASE("can zip, transform, enumerate a range", "[range] [transform] [zip] [d
             ++n;
         }
     }
+    REQUIRE(n == 20);
 
     n = 0;
 
@@ -85,6 +87,7 @@ TEST_CASE("can zip, transform, enumerate a range", "[range] [transform] [zip] [d
             ++n;
         }
     }
+    REQUIRE(n == 20);
 }
 
 TEST_CASE("range can be constructed", "[distance] [enumerate] [range]")
