@@ -29,7 +29,7 @@ Arrays are immutable, meaning that you manipulate them by applying transformatio
 There is one exception to immutability, a `unique_array`, which is memory-backed and read/write, so it enables procedural loading of data into a memory-backed array. The `unique_array` owns its data buffer, and is move-constructible but not copy-constructible (following the semantics of `std::unique_ptr`). After loading data into it, it can be moved to a shared (immutable, copy-constructible) memory-backed array. Mutable arrays are made non-copyable to ensure that you're not accidentally passing around heavyweight objects by value.
 
 
-## Quick-start
+## Quick-start examples
 Create a 10 x 20 array of zero-initialized ints:
 ```C++
 auto A = nd::zeros(10, 20);
@@ -125,7 +125,7 @@ Take the cartesian product of a sequence of arrays:
 auto X = nd::cartesian_product(x, y, z); // X(i, j, k) == std::make_tuple(x(i), y(j), z(k))
 ```
 
-Create N, N-dimensional arrys from N 1d arrays:
+Create N, N-dimensional arrays from N 1d arrays:
 ```C++
 auto [X, Y] = nd::meshgrid(x, y); // X.shape() == Y.shape() == {x.size(), y.size()}
 ```
@@ -276,9 +276,9 @@ auto evaluate_on()
 }
 ```
 
-The actual mileage you'll get out of this approach may vary with type of memory access patterns your arrays are using, and what type of calculations are being done. Typically, the more work you do per evaluation of `operator()`, the better.
+The actual mileage you'll get out of this approach may vary with type of memory access patterns your arrays are using, and what type of calculations are being done. Typically, the more work you do per evaluation of `operator()`, the better. The `partition_shape` function divvies the shape on axis 0, which is appropriate for C-style arrays. If you have written a custom memory-backed provider which instead accesses memory Fortran-style, you should partition the shape on the last axis, since otherwise your threads will contend for cache lines (see [false sharing](https://en.wikipedia.org/wiki/False_sharing)).
 
-Note that reductions are also a parallelizable operation - as an excerise, try implementing a multi-threaded `reduce_on` operator!
+Note that reductions are also a parallelizable operation - you could easily adapt this example to write a multi-threaded `reduce_on` operator.
 
 
 ## TODO items
