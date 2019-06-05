@@ -27,6 +27,7 @@
 
 
 #pragma once
+#include <algorithm>  // std::find
 #include <functional> // std::plus, std::multiplies
 #include <stdexcept>  // std::out_of_range
 #include <tuple>      // std::tuple
@@ -46,6 +47,9 @@ namespace sq
 
     template<std::size_t Rank, typename ValueType>
     auto uniform_sequence(ValueType uniform_value);
+
+    template<std::size_t Rank>
+    auto range_sequence();
 
     template<std::size_t Index, typename ValueType, std::size_t Rank>
     auto get(const sequence_t<ValueType, Rank>& seq);
@@ -256,6 +260,27 @@ auto sq::uniform_sequence(ValueType uniform_value)
 
     for (std::size_t i = 0; i < Rank; ++i)
         result[i] = uniform_value;
+
+    return result;
+}
+
+
+
+
+/**
+ * @brief      Return a sequence of increasing size_t values [0 .. Rank - 1].
+ *
+ * @tparam     Rank  The sequence's rank
+ *
+ * @return     The sequence
+ */
+template<std::size_t Rank>
+auto sq::range_sequence()
+{
+    auto result = sequence_t<std::size_t, Rank>();
+
+    for (std::size_t i = 0; i < Rank; ++i)
+        result[i] = i;
 
     return result;
 }
