@@ -80,6 +80,7 @@ namespace nd2
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
     template<typename ArgType, std::size_t Rank>       auto promote(ArgType, shape_t<Rank>);
+    template<typename ArrayType>                       auto enumerate(ArrayType array);
     template<typename ArrayType>                       auto unzip(ArrayType array);
     template<typename... ArrayTypes>                   auto zip(ArrayTypes... arrays);
     template<typename... ArrayTypes>                   auto cartesian_product(ArrayTypes... arrays);
@@ -117,6 +118,7 @@ struct nd2::shape_t
 
     bool operator==(const shape_t& other) const { return seq == other.seq; }
     bool operator!=(const shape_t& other) const { return seq != other.seq; }
+    std::size_t& operator[](std::size_t i) { return seq[i]; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
 
     std::size_t volume() const { return sq::product(seq); }
@@ -154,6 +156,7 @@ struct nd2::index_t
 
     bool operator==(const index_t& other) const { return seq == other.seq; }
     bool operator!=(const index_t& other) const { return seq != other.seq; }
+    std::size_t& operator[](std::size_t i) { return seq[i]; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
 
     auto to_tuple() const
@@ -176,6 +179,7 @@ struct nd2::jumps_t
 
     bool operator==(const jumps_t& other) const { return seq == other.seq; }
     bool operator!=(const jumps_t& other) const { return seq != other.seq; }
+    std::size_t& operator[](std::size_t i) { return seq[i]; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
 
     sq::sequence_t<std::size_t, Rank> seq;
@@ -210,6 +214,7 @@ public:
 template<std::size_t Rank>
 struct nd2::access_pattern_t
 {
+    //=========================================================================
     struct iterator
     {
         using iterator_category = std::input_iterator_tag;
@@ -479,8 +484,30 @@ public:
     using provider_type = Provider;
     using value_type = typename Provider::value_type;
     using is_ndarray = std::true_type;
-    static constexpr std::size_t rank = Provider::rank;
+    static constexpr std::size_t array_rank = Provider::rank;
 
+    // iterator
+    //=========================================================================
+    struct iterator
+    {
+        using iterator_category = std::input_iterator_tag;
+        using value_type = value_type;
+        using difference_type = std::ptrdiff_t;
+        using pointer = value_type*;
+        using reference = value_type&;
+
+        iterator& operator++() { ++current; return *this; }
+        bool operator==(const iterator& other) const { return current == other.current; }
+        bool operator!=(const iterator& other) const { return current != other.current; }
+        decltype(auto) operator*() const { return array(*current); }
+
+        array_t array;
+        // access_pattern_t<array_rank> accessor;
+        typename access_pattern_t<array_rank>::iterator current;
+    };
+
+    // constructors
+    //=========================================================================
     array_t() {}
     array_t(Provider provider) : provider(provider) {}
 
@@ -488,8 +515,8 @@ public:
     //=========================================================================
     template<typename... Args> decltype(auto) operator()(Args... args) const { return provider(make_index(args...)); }
     template<typename... Args> decltype(auto) operator()(Args... args)       { return provider(make_index(args...)); }
-    decltype(auto) operator()(const index_t<rank>& index) const { return provider(index); }
-    decltype(auto) operator()(const index_t<rank>& index)       { return provider(index); }
+    decltype(auto) operator()(const index_t<array_rank>& index) const { return provider(index); }
+    decltype(auto) operator()(const index_t<array_rank>& index)       { return provider(index); }
     decltype(auto) data() const { return provider.data(); }
     decltype(auto) data()       { return provider.data(); }
 
@@ -502,6 +529,9 @@ public:
     auto indexes() const { return make_access_pattern(provider.shape()); }
     template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
     template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
+
+    auto begin() const { return iterator {*this, indexes().begin()}; }
+    auto end() const { return iterator {*this, indexes().end()}; }
 
     // methods converting this to a memory-backed array
     //=========================================================================
@@ -761,7 +791,6 @@ auto nd2::ones(Args... args)
  *
  * @return     An array with the given shape
  */
-
 template<typename ArgType, std::size_t Rank>
 auto nd2::promote(ArgType arg, shape_t<Rank> shape)
 {
@@ -773,6 +802,30 @@ auto nd2::promote(ArgType arg, shape_t<Rank> shape)
     {
         return make_array([arg] (auto) { return arg; }, shape);
     }
+}
+
+
+
+
+/**
+ * @brief      Return an array with tuple elements, the first of which is the
+ *             linear array offset and the second is the array value.
+ *
+ * @param[in]  array      The array to enumerate
+ *
+ * @tparam     ArrayType  The type of the array
+ *
+ * @return     The array
+ * @note       Typical usage might be `for (auto [n, x] : array) { ... }`.
+ */
+template<typename ArrayType>
+auto nd2::enumerate(ArrayType array)
+{
+    auto offset_array = make_array([strides = make_strides_row_major(array.shape())] (auto index)
+    {
+        return strides.compute_offset(index);
+    }, array.shape());
+    return zip(offset_array, array);
 }
 
 
@@ -815,7 +868,7 @@ auto nd2::unzip(ArrayType array)
 template<typename... ArrayTypes>
 auto nd2::zip(ArrayTypes... arrays)
 {
-    constexpr std::size_t Ranks[] = {ArrayTypes::rank...};
+    constexpr std::size_t Ranks[] = {ArrayTypes::array_rank...};
     shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
 
     if (std::adjacent_find(std::begin(shapes), std::end(shapes), std::not_equal_to<>()) != std::end(shapes))

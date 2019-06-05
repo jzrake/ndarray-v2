@@ -153,6 +153,17 @@ TEST_CASE("memory strides methods work correctly", "[memory_strides]")
     REQUIRE(strides.compute_offset(1, 1, 1) == 4 * 5 + 5 + 1);
 }
 
+TEST_CASE("access pattern methods work correctly", "[access_pattern]")
+{
+    auto accessor = nd2::make_access_pattern(10);
+    int n = 0;
+
+    for (auto ind : accessor)
+    {
+        REQUIRE(ind[0] == n++);
+    }
+}
+
 
 
 
@@ -223,6 +234,27 @@ TEST_CASE("array arithmetic operators work", "[array]")
     REQUIRE((a + 1)(19) == 2.0);
     REQUIRE((1 + a)(19) == 2.0);
     REQUIRE_THROWS(a + nd2::linspace(0.0, 1.0, 21));
+}
+
+TEST_CASE("arrays can be iterated over", "[array]")
+{
+    auto a = nd2::linspace(0.0, 1.0, 11);
+    double x = 0.0;
+    double y = 0.0;
+    int n = 0;
+
+    for (auto xi : a)
+    {
+        REQUIRE(xi == Approx(x));
+        x += 0.1;
+    }
+    for (auto [ni, yi] : nd2::enumerate(a))
+    {
+        REQUIRE(yi == Approx(y));
+        REQUIRE(ni == n);
+        y += 0.1;
+        n += 1;
+    }
 }
 
 
