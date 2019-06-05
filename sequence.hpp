@@ -322,12 +322,11 @@ auto sq::get_from_each(sequence_t<ValueTypes, Rank>... seqs)
 template<typename... ValueTypes, std::size_t Rank>
 auto sq::zip(sequence_t<ValueTypes, Rank>... seqs)
 {
-    return sq::detail::index_apply<sizeof...(seqs)>([&] (auto... Is)
+    return sq::detail::index_apply<Rank>([&] (auto... Is)
     {
         return make_sequence(get_from_each<Is>(seqs...)...);
     });
 }
-
 
 
 

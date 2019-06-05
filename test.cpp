@@ -65,6 +65,11 @@ TEST_CASE("sequences can be reduced", "[sequence]")
     REQUIRE(sq::sum(a) == (a | sq::sum()));
     REQUIRE(sq::sum(a) == 6);
     REQUIRE(sq::product(a) == 6);
+
+    auto b = sq::make_sequence(4, 3, 2);
+    REQUIRE(sq::sum(b) == (b | sq::sum()));
+    REQUIRE(sq::sum(b) == 9);
+    REQUIRE(sq::product(b) == 24);
 }
 
 TEST_CASE("sequence indexes can be read", "[sequence]")
@@ -117,6 +122,14 @@ TEST_CASE("shape methods work correctly", "[shape]")
     REQUIRE(shape.select(1, 2) == nd2::make_shape(4, 8));
     REQUIRE(shape.remove(1, 2) == nd2::make_shape(2, 16));
     REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(8, 9, 2, 4, 8, 16));
+}
+
+TEST_CASE("memory strides methods work correctly", "[memory_strides]")
+{
+    auto strides = nd2::make_strides_row_major(nd2::make_shape(3, 4, 5));
+
+    REQUIRE(strides == nd2::memory_strides_t<3>({4 * 5, 5, 1}));
+    REQUIRE(strides.compute_offset(1, 1, 1) == 4 * 5 + 5 + 1);
 }
 
 
