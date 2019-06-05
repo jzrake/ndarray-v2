@@ -257,6 +257,23 @@ TEST_CASE("arrays can be iterated over", "[array]")
     }
 }
 
+TEST_CASE("arrays evaluate to memory-backed unique and shared", "[array]")
+{
+    auto A = nd2::range(10);
+    auto B = nd2::range(10) | nd2::to_shared();
+    REQUIRE((A == B)(0));
+    REQUIRE((A == B)(9));
+}
+
+TEST_CASE("array reductions work", "[array]")
+{
+    auto A = nd2::range(3);
+
+    REQUIRE((A | nd2::sum()) == 3);
+    REQUIRE((A | nd2::min()) == 0);
+    REQUIRE((A | nd2::max()) == 2);
+}
+
 
 
 

@@ -51,6 +51,7 @@ namespace nd2
     template<std::size_t Rank> struct memory_strides_t;
     template<std::size_t Rank> struct access_pattern_t;
     template<typename Provider> class array_t;
+    template<typename ValueType> class buffer_t;
 
     // provider types
     //=========================================================================
@@ -72,11 +73,15 @@ namespace nd2
 
     // array factories
     //=========================================================================
-    inline auto range(int count);
-    inline auto range(int start, int final, int step=1);
-    inline auto linspace(double x0, double x1, std::size_t count);
-    template<typename Provider>                        auto make_array(Provider provider);
+    inline                                             auto range(int count);
+    inline                                             auto range(int start, int final, int step=1);
+    inline                                             auto linspace(double x0, double x1, std::size_t count);
+    template<typename Provider>                        auto make_array(Provider&& provider);
     template<typename Mapping, std::size_t Rank>       auto make_array(Mapping mapping, shape_t<Rank> shape);
+    template<typename ValueType, std::size_t Rank>     auto make_shared_array(shape_t<Rank> shape);
+    template<typename ValueType, typename... Args>     auto make_shared_array(Args... args);
+    template<typename ValueType, std::size_t Rank>     auto make_unique_array(shape_t<Rank> shape);
+    template<typename ValueType, typename... Args>     auto make_unique_array(Args... args);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
     template<typename ValueType=int, typename... Args> auto ones(Args... args);
     template<typename ArgType, std::size_t Rank>       auto promote(ArgType, shape_t<Rank>);
@@ -88,6 +93,19 @@ namespace nd2
     template<typename... Args>                         auto read_index(Args... args);
     template<typename Function>                        auto map(Function function);
     template<typename Function>                        auto apply(Function fn);
+
+    // array operators
+    //=========================================================================
+    inline auto to_shared();
+    inline auto to_unique();
+    inline auto bounds_check();
+    inline auto sum();
+    inline auto all();
+    inline auto any();
+    inline auto min();
+    inline auto max();
+    template<typename ArrayType> auto min(ArrayType&& array);
+    template<typename ArrayType> auto max(ArrayType&& array);
 }
 
 
@@ -470,12 +488,7 @@ struct nd2::access_pattern_t
 
 
 
-/**
- * @brief      The actual array class template
- *
- * @tparam     Provider  Type defining the index space and mapping from indexes
- *                       to values
- */
+//=============================================================================
 template<typename Provider>
 class nd2::array_t
 {
@@ -484,7 +497,7 @@ public:
     using provider_type = Provider;
     using value_type = typename Provider::value_type;
     using is_ndarray = std::true_type;
-    static constexpr std::size_t array_rank = Provider::rank;
+    static constexpr std::size_t array_rank = Provider::provider_rank;
 
     // iterator
     //=========================================================================
@@ -509,7 +522,7 @@ public:
     // constructors
     //=========================================================================
     array_t() {}
-    array_t(Provider provider) : provider(provider) {}
+    array_t(Provider&& provider) : provider(std::move(provider)) {}
 
     // indexing functions
     //=========================================================================
@@ -522,6 +535,7 @@ public:
 
     // query functions and operator support
     //=========================================================================
+    constexpr std::size_t rank() const { return array_rank; }
     auto shape() const { return provider.shape(); }
     auto shape(std::size_t axis) const { return provider.shape()[axis]; }
     auto size() const { return provider.size(); }
@@ -547,13 +561,115 @@ private:
 
 
 //=============================================================================
+template<typename ValueType>
+class nd2::buffer_t
+{
+public:
+
+    using value_type = ValueType;
+
+    //=========================================================================
+    ~buffer_t() { delete [] memory; }
+    buffer_t() {}
+    buffer_t(const buffer_t& other) = delete;
+    buffer_t& operator=(const buffer_t& other) = delete;
+
+    buffer_t(buffer_t&& other)
+    {
+        memory = other.memory;
+        count = other.count;
+        other.memory = nullptr;
+        other.count = 0;
+    }
+
+    buffer_t(std::size_t count, ValueType value=ValueType())
+    : count(count)
+    , memory(new ValueType[count])
+    {
+        for (std::size_t n = 0; n < count; ++n)
+        {
+            memory[n] = value;
+        }
+    }
+
+    template<class IteratorType>
+    buffer_t(IteratorType first, IteratorType last) : count(std::distance(first, last)), memory(new ValueType[count])
+    {
+        for (std::size_t n = 0; n < count; ++n)
+        {
+            memory[n] = *first++;
+        }
+    }
+
+    buffer_t& operator=(buffer_t&& other)
+    {
+        delete [] memory;
+        memory = other.memory;
+        count = other.count;
+
+        other.memory = nullptr;
+        other.count = 0;
+        return *this;
+    }
+
+    // bool operator==(const buffer_t& other) const
+    // {
+    //     return count == other.count
+    //     && all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) == std::get<1>(t); });
+    // }
+
+    // bool operator!=(const buffer_t& other) const
+    // {
+    //     return count != other.count
+    //     || any_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) != std::get<1>(t); });
+    // }
+
+    bool empty() const { return count == 0; }
+    std::size_t size() const { return count; }
+
+    const ValueType* data() const { return memory; }
+    const ValueType* begin() const { return memory; }
+    const ValueType* end() const { return memory + count; }
+    const ValueType& operator[](std::size_t offset) const { return memory[offset]; }
+    const ValueType& at(std::size_t offset) const
+    {
+        if (offset >= count)
+        {
+            throw std::out_of_range("buffer_t index out of range");
+        }
+        return memory[offset];
+    }
+
+    ValueType* data() { return memory; }
+    ValueType* begin() { return memory; }
+    ValueType* end() { return memory + count; }
+    ValueType& operator[](std::size_t offset) { return memory[offset]; }
+    ValueType& at(std::size_t offset)
+    {
+        if (offset >= count)
+        {
+            throw std::out_of_range("buffer_t index out of range");
+        }
+        return memory[offset];
+    }
+
+private:
+    //=========================================================================
+    std::size_t count = 0;
+    ValueType* memory = nullptr;
+};
+
+
+
+
+//=============================================================================
 template<typename Mapping, std::size_t Rank>
 class nd2::basic_provider_t
 {
 public:
 
     using value_type = std::invoke_result_t<Mapping, index_t<Rank>>;
-    static constexpr std::size_t rank = Rank;
+    static constexpr std::size_t provider_rank = Rank;
 
     //=========================================================================
     basic_provider_t(Mapping mapping, shape_t<Rank> the_shape) : mapping(mapping), the_shape(the_shape) {}
@@ -565,6 +681,91 @@ private:
     //=========================================================================
     Mapping mapping;
     shape_t<Rank> the_shape;
+};
+
+
+
+
+//=============================================================================
+template<std::size_t Rank, typename ValueType>
+class nd2::shared_provider_t
+{
+public:
+
+    using value_type = ValueType;
+    static constexpr std::size_t provider_rank = Rank;
+
+    //=========================================================================
+    shared_provider_t() {}
+    shared_provider_t(shape_t<Rank> the_shape, std::shared_ptr<buffer_t<ValueType>> buffer)
+    : the_shape(the_shape)
+    , strides(make_strides_row_major(the_shape))
+    , buffer(buffer)
+    {
+        if (the_shape.volume() != buffer->size())
+        {
+            throw std::logic_error("shape and buffer sizes do not match");
+        }
+    }
+
+    const ValueType& operator()(const index_t<Rank>& index) const
+    {
+        return buffer->operator[](strides.compute_offset(index));
+    }
+
+    auto shape() const { return the_shape; }
+    auto size() const { return the_shape.volume(); }
+    const ValueType* data() const { return buffer->data(); }
+    template<std::size_t R> auto reshape(shape_t<R> new_shape) const { return shared_provider_t<R, ValueType>(new_shape, buffer); }
+
+private:
+    //=========================================================================
+    shape_t<Rank> the_shape;
+    memory_strides_t<Rank> strides;
+    std::shared_ptr<buffer_t<ValueType>> buffer;
+};
+
+
+
+
+//=============================================================================
+template<std::size_t Rank, typename ValueType>
+class nd2::unique_provider_t
+{
+public:
+
+    using value_type = ValueType;
+    static constexpr std::size_t provider_rank = Rank;
+
+    //=========================================================================
+    unique_provider_t(shape_t<Rank> the_shape)
+    : the_shape(the_shape)
+    , strides(make_strides_row_major(the_shape))
+    , buffer(the_shape.volume())
+    {
+    }
+
+    const ValueType& operator()(const index_t<Rank>& index) const { return buffer.operator[](strides.compute_offset(index)); }
+    /* */ ValueType& operator()(const index_t<Rank>& index)       { return buffer.operator[](strides.compute_offset(index)); }
+    template<typename... Args> const ValueType& operator()(Args... args) const { return operator()(make_index(args...)); }
+    template<typename... Args> /* */ ValueType& operator()(Args... args)       { return operator()(make_index(args...)); }
+
+    auto shape() const { return the_shape; }
+    auto size() const { return the_shape.volume(); }
+    const ValueType* data() const { return buffer.data(); }
+    ValueType* data() { return buffer.data(); }
+
+    auto shared() const & { return shared_provider_t(the_shape, std::make_shared<buffer_t<ValueType>>(buffer.begin(), buffer.end())); }
+    auto shared()      && { return shared_provider_t(the_shape, std::make_shared<buffer_t<ValueType>>(std::move(buffer))); }
+
+    template<std::size_t R> auto reshape(shape_t<R> new_shape) const & { return unique_provider_t<R, ValueType>(new_shape, buffer_t<ValueType>(buffer.begin(), buffer.end())); }
+    template<std::size_t R> auto reshape(shape_t<R> new_shape)      && { return unique_provider_t<R, ValueType>(new_shape, std::move(buffer)); }
+
+private:
+    //=========================================================================
+    shape_t<Rank> the_shape;
+    memory_strides_t<Rank> strides;
+    buffer_t<ValueType> buffer;
 };
 
 
@@ -651,9 +852,9 @@ auto nd2::make_strides_row_major(const shape_t<Rank>& shape)
  * @return     The array
  */
 template<typename Provider>
-auto nd2::make_array(Provider provider)
+auto nd2::make_array(Provider&& provider)
 {
-    return array_t<Provider>(provider);
+    return array_t<Provider>(std::forward<Provider>(provider));
 }
 
 
@@ -675,6 +876,58 @@ template<typename Mapping, std::size_t Rank>
 auto nd2::make_array(Mapping mapping, shape_t<Rank> shape)
 {
     return make_array(basic_provider_t<Mapping, Rank>(mapping, shape));
+}
+
+
+
+
+/**
+ * @brief      Make a shared (immutable, copyable, memory-backed) array with the
+ *             given shape, initialized to the default-constructed ValueType.
+ *
+ * @param[in]  shape      The shape
+ *
+ * @tparam     ValueType  The value type of the array
+ * @tparam     Rank       The rank of the array
+ *
+ * @return     The array
+ */
+template<typename ValueType, std::size_t Rank>
+auto nd2::make_shared_array(shape_t<Rank> shape)
+{
+    return make_array(shared_provider_t<Rank, ValueType>(shape));
+}
+
+template<typename ValueType, typename... Args>
+auto nd2::make_shared_array(Args... args)
+{
+    return make_shared_array(make_shape(args...));
+}
+
+
+
+
+/**
+ * @brief      Make a unique (mutable, non-copyable, memory-backed) array with
+ *             the given shape.
+ *
+ * @param[in]  shape      The shape
+ *
+ * @tparam     ValueType  The value type of the array
+ * @tparam     Rank       The rank of the array
+ *
+ * @return     The array
+ */
+template<typename ValueType, std::size_t Rank>
+auto nd2::make_unique_array(shape_t<Rank> shape)
+{
+    return make_array(unique_provider_t<Rank, ValueType>(shape));
+}
+
+template<typename ValueType, typename... Args>
+auto nd2::make_unique_array(Args... args)
+{
+    return make_unique_array<ValueType>(make_shape(args...));
 }
 
 
@@ -912,7 +1165,6 @@ auto nd2::cartesian_product(ArrayTypes... arrays)
 
 
 
-
 /**
  * @brief      Reads an index from an array.
  *
@@ -987,6 +1239,52 @@ auto nd2::apply(Function fn)
 
 
 
+/**
+ * @brief      Return an operator that, applied to any array will yield a
+ *             shared, memory-backed version of that array.
+ *
+ * @return     The operator
+ */
+auto nd2::to_shared()
+{
+    return [] (auto array)
+    {
+        auto target_provider = unique_provider_t<array.rank(), typename decltype(array)::value_type>(array.shape());
+
+        for (auto index : array.indexes())
+        {
+            target_provider(index) = array(index);
+        }
+        return make_array(std::move(target_provider).shared());
+    };
+}
+
+
+
+
+/**
+ * @brief      Return an operator that, applied to any array will yield a
+ *             unique, memory-backed version of that array.
+ *
+ * @return     The operator
+ */
+auto nd2::to_unique()
+{
+    return [] (auto array)
+    {
+        auto target_provider = unique_provider_t<array.rank(), typename decltype(array)::value_type>(array.shape());
+
+        for (auto index : array.indexes())
+        {
+            target_provider(index) = array(index);
+        }
+        return make_array(std::move(target_provider));
+    };
+}
+
+
+
+
 //=============================================================================
 namespace nd2
 {
@@ -1031,4 +1329,179 @@ namespace nd2
     template<typename T, typename P> auto operator- (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::minus<>()); }
     template<typename T, typename P> auto operator* (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::multiplies<>()); }
     template<typename T, typename P> auto operator/ (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::divides<>()); }
+}
+
+
+
+
+/**
+ * @brief      Return an operator that turns an array into a bounds-checking
+ *             array.
+ *
+ * @return     The array
+ */
+auto nd2::bounds_check()
+{
+    return [] (auto&& array)
+    {
+        auto mapping = [array] (auto&& index)
+        {
+            if (! array.shape().contains(index))
+            {
+                throw std::out_of_range("index out-of-range");
+            }
+            return array(index);
+        };
+        return make_array(mapping, array.shape());
+    };
+}
+
+
+
+
+/**
+ * @brief      Return an operator that sums the elements of an array.
+ *
+ * @return     The operator
+ *
+ * @note       The return type is the same as the array value type, except if
+ *             it's bool - in which case the return type is unsigned long.
+ */
+auto nd2::sum()
+{
+    return [] (auto&& array)
+    {
+        using value_type = nd::value_type_of<decltype(array)>;
+        using is_boolean = std::is_same<value_type, bool>;
+        using result_type = std::conditional_t<is_boolean::value, unsigned long, value_type>;
+
+        auto result = result_type();
+
+        for (const auto& i : array.indexes())
+        {
+            result += array(i);
+        }
+        return result;
+    };
+}
+
+
+
+
+/**
+ * @brief      Return a reduce operator that returns true if all of its
+ *             argument array's elements evaluate to true.
+ *
+ * @return     The operator
+ */
+auto nd2::all()
+{
+    return [] (auto&& array)
+    {
+        for (const auto& i : array.indexes()) if (! array(i)) return false;
+        return true;
+    };
+}
+
+
+
+
+/**
+ * @brief      Return a reduce operator that returns true if any of its
+ *             argument array's elements evaluate to true.
+ *
+ * @return     The operator
+ */
+auto nd2::any()
+{
+    return [] (auto&& array)
+    {
+        for (const auto& i : array.indexes()) if (array(i)) return true;
+        return false;
+    };
+}
+
+
+
+
+
+/**
+ * @brief      Return an operator that gets the minimum value of an array.
+ *
+ * @return     The operator
+ */
+auto nd2::min()
+{
+    return [] (auto&& array) { return min(std::forward<decltype(array)>(array)); };
+}
+
+
+
+
+/**
+ * @brief      Return an operator that gets the maximum value of an array.
+ *
+ * @return     The operator
+ */
+auto nd2::max()
+{
+    return [] (auto&& array) { return max(std::forward<decltype(array)>(array)); };
+}
+
+
+
+
+/**
+ * @brief      Return the minimum value of an array.
+ *
+ * @param      array      The array
+ *
+ * @tparam     ArrayType  The type of the array
+ *
+ * @return     The minimum value
+ */
+template<typename ArrayType>
+auto nd2::min(ArrayType&& array)
+{
+    auto result = nd::value_type_of<ArrayType>();
+    auto first = true;
+
+    for (const auto& i : array.indexes())
+    {
+        if (first || array(i) < result)
+        {
+            result = array(i);
+        }
+        first = false;
+    }
+    return result;
+}
+
+
+
+
+/**
+ * @brief      Return the maximum value of an array.
+ *
+ * @param      array      The array
+ *
+ * @tparam     ArrayType  The type of the array
+ *
+ * @return     The maximum value
+ */
+template<typename ArrayType>
+auto nd2::max(ArrayType&& array)
+{
+    auto result = nd::value_type_of<ArrayType>();
+    auto first = true;
+
+    for (const auto& i : array.indexes())
+    {
+        if (first || array(i) > result)
+        {
+            result = array(i);
+        }
+        first = false;
+    }
+    return result;
 }
