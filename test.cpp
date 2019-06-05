@@ -187,6 +187,19 @@ TEST_CASE("arrays can be created with linspace", "[array]")
     REQUIRE(nd2::linspace(0, 1, 11)(10) == 1.0);
 }
 
+TEST_CASE("array can be zipped together", "[array]")
+{
+    auto a = nd2::range(10);
+    auto b = nd2::linspace(0.0, 1.0, 10);
+    REQUIRE(nd2::zip_arrays(a, b)(0) == std::make_tuple(a(0), b(0)));
+    REQUIRE(nd2::zip_arrays(a, b)(9) == std::make_tuple(a(9), b(9)));
+    REQUIRE_THROWS(nd2::zip_arrays(nd2::range(10), nd2::range(11)));
+
+    auto [a1, b1] = nd2::unzip_array(nd2::zip_arrays(a, b));
+    REQUIRE(a1(0) == a(0));
+    REQUIRE(b1(0) == b(0));
+}
+
 TEST_CASE("array can be created as a cartesian product", "[array]")
 {
     auto a = nd2::range(10);

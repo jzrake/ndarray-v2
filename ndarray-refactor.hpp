@@ -74,9 +74,14 @@ namespace nd2
     //=========================================================================
     template<typename Provider> auto make_array(Provider provider);
     template<typename Mapping, std::size_t Rank> auto make_array(Mapping mapping, shape_t<Rank> shape);
+    template<typename ValueType=int, typename... Args> auto zeros(Args... args);
+    template<typename ValueType=int, typename... Args> auto ones(Args... args);
     inline auto range(int count);
     inline auto range(int start, int final, int step=1);
     inline auto linspace(double x0, double x1, std::size_t count);
+
+    template<typename... ArrayTypes> auto zip_arrays(ArrayTypes... arrays);
+    template<typename ArrayType> auto unzip_array(ArrayType array);
 
     template<typename... ArrayTypes> auto cartesian_product(ArrayTypes... arrays);
 }
@@ -632,11 +637,51 @@ auto nd2::make_array(Mapping mapping, shape_t<Rank> shape)
 
 
 /**
+ * @brief      Return an array of zeros with the given shape
+ *
+ * @param[in]  args       shape arguments
+ *
+ * @tparam     ValueType  Defaults to int; use e.g. zeros<double>(...) for other
+ *                        types
+ * @tparam     Args       Argument types (should be a positive integral type)
+ *
+ * @return     An array of zeros, not requiring any storage
+ */
+template<typename ValueType, typename... Args>
+auto nd2::zeros(Args... args)
+{
+    return make_array([] (auto) { return ValueType(0); }, make_shape(args...));
+}
+
+
+
+
+/**
+ * @brief      Return an array of ones with the given shape
+ *
+ * @param[in]  args       shape arguments
+ *
+ * @tparam     ValueType  Defaults to int; use e.g. ones<double>(...) for other
+ *                        types
+ * @tparam     Args       Argument types (should be a positive integral type)
+ *
+ * @return     An array of ones, not requiring any storage
+ */
+template<typename ValueType, typename... Args>
+auto nd2::ones(Args... args)
+{
+    return make_array([] (auto) { return ValueType(1); }, make_shape(args...));
+}
+
+
+
+
+/**
  * @brief      Return a 1d array [0 .. count - 1]
  *
  * @param[in]  count  The number of elements
  *
- * @return     The array
+ * @return     The array, not requiring any storage
  */
 auto nd2::range(int count)
 {
@@ -653,7 +698,7 @@ auto nd2::range(int count)
  * @param[in]  final      The final element (one past the end)
  * @param[in]  step       The step size
  *
- * @return     The array
+ * @return     The array, not requiring any storage
  */
 auto nd2::range(int start, int final, int step)
 {
@@ -678,7 +723,7 @@ auto nd2::range(int start, int final, int step)
  * @param[in]  x1     The right end-point
  * @param[in]  count  The number of points to place
  *
- * @return     The array
+ * @return     The array, not requiring any storage
  */
 auto nd2::linspace(double x0, double x1, std::size_t count)
 {
@@ -692,14 +737,69 @@ auto nd2::linspace(double x0, double x1, std::size_t count)
 
 
 /**
- * @brief      Return an array that is the cartesian product of the argument
+ * @brief      Zip a sequence identically-shaped arrays together
+ *
+ * @param      arrays      The arrays
+ *
+ * @tparam     ArrayTypes  The types of the arrays
+ *
+ * @return     An array which returns tuples taken from the underlying arrays
+ */
+template<typename... ArrayTypes>
+auto nd2::zip_arrays(ArrayTypes... arrays)
+{
+    constexpr std::size_t Ranks[] = {ArrayTypes::rank...};
+    shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
+
+    if (std::adjacent_find(std::begin(shapes), std::end(shapes), std::not_equal_to<>()) != std::end(shapes))
+    {
+        throw std::logic_error("cannot zip arrays with different shapes");
+    }
+    auto mapping = [arrays...] (auto&& index)
+    {
+        return std::make_tuple(arrays(index)...);
+    };
+    return make_array(mapping, shapes[0]);
+}
+
+
+
+
+/**
+ * @brief      Turn an array of tuples into a tuple of arrays
+ *
+ * @param[in]  array      The array of tuples
+ *
+ * @tparam     ArrayType  The type of the argument array
+ *
+ * @return     The tuple of arrays
+ */
+template<typename ArrayType>
+auto nd2::unzip_array(ArrayType array)
+{
+    auto get_through = [array] (auto i)
+    {
+        return make_array([i, array] (auto index) { return std::get<i>(array(index)); }, array.shape());
+    };
+    return sq::detail::index_apply<std::tuple_size<typename ArrayType::value_type>::value>([get_through, array] (auto... is)
+    {
+        return std::make_tuple(get_through(is)...);
+    });
+}
+
+
+
+
+/**
+ * @brief      Return an array that is the cartesian product of the 1d argument
  *             arrays, A(i, j, k) == make_tuple(a(i), b(j), c(k))
  *
  * @param[in]  arrays      A sequence of 1d arrays
  *
  * @tparam     ArrayTypes  The types of the argument arrays
  *
- * @return     The array
+ * @return     The array, requiring the storage space of the sum of the 1d
+ *             arrays
  */
 template<typename... ArrayTypes>
 auto nd2::cartesian_product(ArrayTypes... arrays)
