@@ -114,14 +114,35 @@ TEST_CASE("shapes can be constructed", "[shape]")
 
 TEST_CASE("shape methods work correctly", "[shape]")
 {
-    auto shape = nd2::make_shape(2, 4, 8, 16);
-    REQUIRE(shape.volume() == 2 * 4 * 8 * 16);
-    REQUIRE(shape.contains(nd2::make_index(1, 1, 1, 1)));
-    REQUIRE_FALSE(shape.contains(2, 1, 1, 1));
-    REQUIRE(shape.last_index() == nd2::make_index(2, 4, 8, 16));
-    REQUIRE(shape.select(1, 2) == nd2::make_shape(4, 8));
-    REQUIRE(shape.remove(1, 2) == nd2::make_shape(2, 16));
-    REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(8, 9, 2, 4, 8, 16));
+    SECTION("test 1")
+    {
+        auto shape = nd2::make_shape(2, 4, 8, 16);
+        REQUIRE(shape.volume() == 2 * 4 * 8 * 16);
+        REQUIRE(shape.contains(nd2::make_index(1, 1, 1, 1)));
+        REQUIRE(shape.last_index() == nd2::make_index(2, 4, 8, 16));
+        REQUIRE(shape.select(1, 2) == nd2::make_shape(4, 8));
+        REQUIRE(shape.remove(1, 2) == nd2::make_shape(2, 16));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(8, 9, 2, 4, 8, 16));
+        REQUIRE_FALSE(shape.contains(2, 1, 1, 1));
+    }
+
+    SECTION("test 2")
+    {
+        auto shape = nd2::make_shape(0, 1, 2);
+        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(2));
+        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(1, 2)) == nd2::make_shape(0));
+        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(0, 2)) == nd2::make_shape(1));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(8, 9, 0, 1, 2));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(1, 2)) == nd2::make_shape(0, 8, 9, 1, 2));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(2, 3)) == nd2::make_shape(0, 1, 8, 9, 2));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(3, 4)) == nd2::make_shape(0, 1, 2, 8, 9));
+    }
+}
+
+TEST_CASE("indexes work correctly", "[index]")
+{
+    auto index = nd2::make_index(2, 3, 4);
+    REQUIRE(index.to_tuple() == std::make_tuple(2, 3, 4));
 }
 
 TEST_CASE("memory strides methods work correctly", "[memory_strides]")
@@ -130,6 +151,49 @@ TEST_CASE("memory strides methods work correctly", "[memory_strides]")
 
     REQUIRE(strides == nd2::memory_strides_t<3>({4 * 5, 5, 1}));
     REQUIRE(strides.compute_offset(1, 1, 1) == 4 * 5 + 5 + 1);
+}
+
+
+
+
+//=============================================================================
+TEST_CASE("arrays can be created with the basic provider", "[array]")
+{
+    auto A = nd2::make_array([] (auto index) { return index[0]; }, nd2::make_shape(10));
+    REQUIRE(A(0) == 0);
+    REQUIRE(A(9) == 9);
+    REQUIRE(A.size() == 10);
+}
+
+TEST_CASE("arrays can be created with range", "[array]")
+{
+    REQUIRE(nd2::range(10).size() == 10);
+    REQUIRE(nd2::range(10)(9) == 9);
+    REQUIRE(nd2::range(5, 10, 2).size() == 3);
+    REQUIRE(nd2::range(5, 10, 2)(0) == 5);
+    REQUIRE(nd2::range(5, 10, 2)(1) == 7);
+    REQUIRE(nd2::range(5, 10, 2)(2) == 9);
+    REQUIRE_THROWS(nd2::range(5, 10, 0));
+    REQUIRE_THROWS(nd2::range(5, 10, -1));
+    REQUIRE_NOTHROW(nd2::range(10, 5, -1));
+    REQUIRE(nd2::range(10, 5, -2).size() == 3);
+}
+
+TEST_CASE("arrays can be created with linspace", "[array]")
+{
+    REQUIRE(nd2::linspace(0, 1, 10).size() == 10);
+    REQUIRE(nd2::linspace(0, 1, 11)(0) == 0.0);
+    REQUIRE(nd2::linspace(0, 1, 11)(1) == 0.1);
+    REQUIRE(nd2::linspace(0, 1, 11)(10) == 1.0);
+}
+
+TEST_CASE("array can be created as a cartesian product", "[array]")
+{
+    auto a = nd2::range(10);
+    auto b = nd2::linspace(0.0, 1.0, 20);
+    REQUIRE(nd2::cartesian_product(a, b)(0, 0) == std::make_tuple(0, 0.0));
+    REQUIRE(nd2::cartesian_product(a, b)(1, 0) == std::make_tuple(1, 0.0));
+    REQUIRE(nd2::cartesian_product(a, b)(0, 1) == std::make_tuple(0, b(1)));
 }
 
 

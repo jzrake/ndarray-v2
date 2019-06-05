@@ -43,23 +43,42 @@
 //=============================================================================
 namespace nd2
 {
+    // support structs
+    //=========================================================================    
     template<std::size_t Rank> struct shape_t;
     template<std::size_t Rank> struct index_t;
     template<std::size_t Rank> struct jumps_t;
     template<std::size_t Rank> struct memory_strides_t;
     template<std::size_t Rank> struct access_pattern_t;
+    template<typename Provider> class array_t;
 
+    // provider types
+    //=========================================================================
+    template<typename Mapping, std::size_t Rank> class basic_provider_t;
+    template<std::size_t Rank, typename ValueType> class shared_provider_t;
+    template<std::size_t Rank, typename ValueType> class unique_provider_t;
+
+    // support struct factories
+    //=========================================================================    
     template<typename... Args> auto make_shape(Args... args);
     template<typename... Args> auto make_index(Args... args);
     template<typename... Args> auto make_jumps(Args... args);
     template<typename... Args> auto make_access_pattern(Args... args);
     template<std::size_t Rank> auto make_access_pattern(shape_t<Rank> shape);
-
     template<std::size_t Rank> auto uniform_shape(std::size_t value);
     template<std::size_t Rank> auto uniform_index(std::size_t value);
     template<std::size_t Rank> auto uniform_jumps(std::size_t value);
-
     template<std::size_t Rank> auto make_strides_row_major(const shape_t<Rank>& shape);
+
+    // array factories
+    //=========================================================================
+    template<typename Provider> auto make_array(Provider provider);
+    template<typename Mapping, std::size_t Rank> auto make_array(Mapping mapping, shape_t<Rank> shape);
+    inline auto range(int count);
+    inline auto range(int start, int final, int step=1);
+    inline auto linspace(double x0, double x1, std::size_t count);
+
+    template<typename... ArrayTypes> auto cartesian_product(ArrayTypes... arrays);
 }
 
 
@@ -123,6 +142,11 @@ struct nd2::index_t
     bool operator!=(const index_t& other) const { return seq != other.seq; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
 
+    auto to_tuple() const
+    {
+        return sq::detail::index_apply<Rank>([s=seq] (auto... is) { return std::make_tuple(sq::get<is>(s)...); });
+    }
+
     sq::sequence_t<std::size_t, Rank> seq;
 };
 
@@ -172,12 +196,6 @@ public:
 template<std::size_t Rank>
 struct nd2::access_pattern_t
 {
-    // using value_type = index_t<Rank>;
-    // static constexpr std::size_t rank = Rank;
-
-
-
-    //=========================================================================
     struct iterator
     {
         using iterator_category = std::input_iterator_tag;
@@ -433,25 +451,72 @@ struct nd2::access_pattern_t
 
 
 
-//=============================================================================
-template<std::size_t Rank>
-auto nd2::make_strides_row_major(const shape_t<Rank>& shape)
+/**
+ * @brief      The actual array class template
+ *
+ * @tparam     Provider  Type defining the index space and mapping from indexes
+ *                       to values
+ */
+template<typename Provider>
+class nd2::array_t
 {
-    auto result = memory_strides_t<Rank>();
+public:
 
-    if constexpr (Rank > 0)
-    {
-        result[Rank - 1] = 1;
-    }
-    if constexpr (Rank > 1)
-    {
-        for (int n = Rank - 2; n >= 0; --n)
-        {
-            result[n] = result[n + 1] * shape[n + 1];
-        }
-    }
-    return result;
-}
+    using provider_type = Provider;
+    using value_type = typename Provider::value_type;
+    using is_ndarray = std::true_type;
+    static constexpr std::size_t rank = Provider::rank;
+
+    array_t() {}
+    array_t(Provider provider) : provider(provider) {}
+
+    // indexing functions
+    //=========================================================================
+    template<typename... Args> decltype(auto) operator()(Args... args) const { return provider(make_index(args...)); }
+    template<typename... Args> decltype(auto) operator()(Args... args)       { return provider(make_index(args...)); }
+    decltype(auto) operator()(const index_t<rank>& index) const { return provider(index); }
+    decltype(auto) operator()(const index_t<rank>& index)       { return provider(index); }
+    decltype(auto) data() const { return provider.data(); }
+    decltype(auto) data()       { return provider.data(); }
+
+    // query functions and operator support
+    //=========================================================================
+    auto shape() const { return provider.shape(); }
+    auto shape(std::size_t axis) const { return provider.shape()[axis]; }
+    auto size() const { return provider.size(); }
+    const Provider& get_provider() const { return provider; }
+    auto indexes() const { return make_access_pattern(provider.shape()); }
+    template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
+    template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
+
+
+private:
+    Provider provider;
+};
+
+
+
+
+//=============================================================================
+template<typename Mapping, std::size_t Rank>
+class nd2::basic_provider_t
+{
+public:
+
+    using value_type = std::invoke_result_t<Mapping, index_t<Rank>>;
+    static constexpr std::size_t rank = Rank;
+
+    //=========================================================================
+    basic_provider_t(Mapping mapping, shape_t<Rank> the_shape) : mapping(mapping), the_shape(the_shape) {}
+    decltype(auto) operator()(const index_t<Rank>& index) const { return mapping(index); }
+    auto shape() const { return the_shape; }
+    auto size() const { return the_shape.volume(); }
+
+private:
+    //=========================================================================
+    Mapping mapping;
+    shape_t<Rank> the_shape;
+};
 
 
 
@@ -487,10 +552,6 @@ auto nd2::make_access_pattern(shape_t<Rank> shape)
     return access_pattern_t<Rank>().with_final(shape.last_index());
 }
 
-
-
-
-//=============================================================================
 template<std::size_t Rank>
 auto nd2::uniform_shape(std::size_t value)
 {
@@ -509,3 +570,146 @@ auto nd2::uniform_jumps(std::size_t value)
     return nd2::jumps_t{sq::uniform_sequence<Rank>(value)};
 }
 
+template<std::size_t Rank>
+auto nd2::make_strides_row_major(const shape_t<Rank>& shape)
+{
+    auto result = memory_strides_t<Rank>();
+
+    if constexpr (Rank > 0)
+    {
+        result[Rank - 1] = 1;
+    }
+    if constexpr (Rank > 1)
+    {
+        for (int n = Rank - 2; n >= 0; --n)
+        {
+            result[n] = result[n + 1] * shape[n + 1];
+        }
+    }
+    return result;
+}
+
+
+
+
+/**
+ * @brief      Return an array created from a custom provider
+ *
+ * @param[in]  provider  The provider backing the array
+ *
+ * @tparam     Provider  The provider type
+ *
+ * @return     The array
+ */
+template<typename Provider>
+auto nd2::make_array(Provider provider)
+{
+    return array_t<Provider>(provider);
+}
+
+
+
+
+/**
+ * @brief      Return an array created from the basic provider defined by a
+ *             function object (the mapping) and a shape.
+ *
+ * @param[in]  mapping  The mapping of indexes to values
+ * @param[in]  shape    The shape of the array
+ *
+ * @tparam     Mapping  The mapping type
+ * @tparam     Rank     The rank of the array
+ *
+ * @return     The array
+ */
+template<typename Mapping, std::size_t Rank>
+auto nd2::make_array(Mapping mapping, shape_t<Rank> shape)
+{
+    return make_array(basic_provider_t<Mapping, Rank>(mapping, shape));
+}
+
+
+
+
+/**
+ * @brief      Return a 1d array [0 .. count - 1]
+ *
+ * @param[in]  count  The number of elements
+ *
+ * @return     The array
+ */
+auto nd2::range(int count)
+{
+    return make_array([] (auto index) { return index[0]; }, nd2::make_shape(count));
+}
+
+
+
+
+/**
+ * @brief      Return a 1d array [start, start + skip .. count - 1]
+ *
+ * @param[in]  start      The starting element
+ * @param[in]  final      The final element (one past the end)
+ * @param[in]  step       The step size
+ *
+ * @return     The array
+ */
+auto nd2::range(int start, int final, int step)
+{
+    if (step == 0 || final / step - start / step < 0)
+    {
+        throw std::invalid_argument("nd::range");
+    }
+    return make_array([=] (auto index)
+    {
+        return start + index[0] * step;
+    }, nd2::make_shape(final / step - start / step));
+}
+
+
+
+
+/**
+ * @brief      Return a 1d array of evenly spaced values between x0 and x1
+ *             (inclusive).
+ *
+ * @param[in]  x0     The left end-point
+ * @param[in]  x1     The right end-point
+ * @param[in]  count  The number of points to place
+ *
+ * @return     The array
+ */
+auto nd2::linspace(double x0, double x1, std::size_t count)
+{
+    return make_array([=] (auto index)
+    {
+        return x0 + (x1 - x0) * index[0] / (count - 1);
+    }, nd2::make_shape(count));
+}
+
+
+
+
+/**
+ * @brief      Return an array that is the cartesian product of the argument
+ *             arrays, A(i, j, k) == make_tuple(a(i), b(j), c(k))
+ *
+ * @param[in]  arrays      A sequence of 1d arrays
+ *
+ * @tparam     ArrayTypes  The types of the argument arrays
+ *
+ * @return     The array
+ */
+template<typename... ArrayTypes>
+auto nd2::cartesian_product(ArrayTypes... arrays)
+{
+    auto mapping = [at = std::make_tuple(arrays...)] (auto index)
+    {
+        return sq::detail::index_apply<sizeof...(ArrayTypes)>([at, it=index.to_tuple()] (auto... is)
+        {
+            return std::make_tuple(std::get<is>(at)(std::get<is>(it))...);
+        });
+    };
+    return make_array(mapping, make_shape(arrays.size()...));
+}
