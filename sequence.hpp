@@ -27,9 +27,10 @@
 
 
 #pragma once
-#include <stdexcept> // std::out_of_range
-#include <tuple>     // std::tuple
-#include <utility>   // std::make_index_sequence
+#include <functional> // std::plus, std::multiplies
+#include <stdexcept>  // std::out_of_range
+#include <tuple>      // std::tuple
+#include <utility>    // std::make_index_sequence
 
 
 
@@ -42,6 +43,9 @@ namespace sq
 
     template<typename... Args, typename ValueType=std::common_type_t<Args...>>
     auto make_sequence(Args... args);
+
+    template<std::size_t Rank, typename ValueType>
+    auto uniform_sequence(ValueType uniform_value);
 
     template<std::size_t Index, typename ValueType, std::size_t Rank>
     auto get(const sequence_t<ValueType, Rank>& seq);
@@ -106,6 +110,41 @@ namespace sq
     auto apply(Fn fn, const sequence_t<ValueType, Rank>& seq);
     template<typename Fn>
     auto apply(Fn fn);
+
+    template<typename Fn, typename ValueType, std::size_t Rank>
+    auto reduce(Fn fn, const sequence_t<ValueType, Rank>& seq, ValueType seed);
+    template<typename Fn, typename ValueType>
+    auto reduce(Fn fn, ValueType seed);
+
+    template<typename ValueType, std::size_t Rank>
+    auto sum(const sequence_t<ValueType, Rank>& seq);
+    auto sum();
+
+    template<typename ValueType, std::size_t Rank>
+    auto product(const sequence_t<ValueType, Rank>& seq);
+    auto product();
+
+    template<typename ValueType, typename Predicate, std::size_t Rank>
+    auto all_of(const sequence_t<ValueType, Rank>& seq, Predicate pred);
+
+    template<typename ValueType, typename Predicate, std::size_t Rank>
+    auto any_of(const sequence_t<ValueType, Rank>& seq, Predicate pred);
+
+    template<typename ValueType, std::size_t Rank, std::size_t NumIndexes>
+    auto read_indexes(const sequence_t<ValueType, Rank>& seq, const sequence_t<std::size_t, NumIndexes>& indexes);
+    template<typename... Args>
+    auto read_indexes(Args... indexes);
+
+    template<typename ValueType, std::size_t Rank, std::size_t NumToInsert>
+    auto insert_elements(
+        const sequence_t<ValueType, Rank>& source,
+        const sequence_t<ValueType, NumToInsert>& values,
+        const sequence_t<std::size_t, NumToInsert>& indexes);
+
+    template<typename ValueType, std::size_t Rank, std::size_t NumToRemove>
+    auto remove_indexes(
+        const sequence_t<ValueType, Rank>& source,
+        const sequence_t<std::size_t, NumToRemove>& indexes);
 }
 
 
@@ -188,11 +227,37 @@ struct sq::sequence_t
  * @tparam     ValueType  The inferred type, if a common type can be inferred
  *
  * @return     The sequence
+ * @note       You can override the inferred value type by doing e.g.
+ *             make_sequence<size_t>(1, 2).
  */
 template<typename... Args, typename ValueType>
 auto sq::make_sequence(Args... args)
 {
     return sequence_t<ValueType, sizeof...(Args)> {ValueType(args)...};
+}
+
+
+
+
+/**
+ * @brief      Return a sequence with all elements equal to the given value.
+ *
+ * @param[in]  uniform_value  The value
+ *
+ * @tparam     Rank           The sequence's rank
+ * @tparam     ValueType      The sequence's value type
+ *
+ * @return     The sequence
+ */
+template<std::size_t Rank, typename ValueType>
+auto sq::uniform_sequence(ValueType uniform_value)
+{
+    auto result = sequence_t<ValueType, Rank>();
+
+    for (std::size_t i = 0; i < Rank; ++i)
+        result[i] = uniform_value;
+
+    return result;
 }
 
 
@@ -594,3 +659,198 @@ auto sq::apply(Fn fn, const sequence_t<ValueType, Rank>& seq)
 };
 template<typename Fn>
 auto sq::apply(Fn fn) { return [fn] (auto&& seq) { return apply(fn, seq); }; }
+
+
+
+
+/**
+ * @brief      Return a reduction (e.g. sum, product) of the given sequence
+ *
+ * @param[in]  fn         A binary function (result, element) -> result
+ * @param[in]  seq        The sequence to reduce
+ * @param[in]  seed       The seed
+ *
+ * @tparam     Fn         The function type
+ * @tparam     ValueType  The sequence's value type
+ * @tparam     Rank       The sequence's rank
+ *
+ * @return     A new sequence
+ */
+template<typename Fn, typename ValueType, std::size_t Rank>
+auto sq::reduce(Fn fn, const sequence_t<ValueType, Rank>& seq, ValueType seed)
+{
+    for (std::size_t i = 0; i < Rank; ++i)
+    {
+        seed = fn(seed, seq[i]);
+    }
+    return seed;
+};
+template<typename Fn, typename ValueType>
+auto sq::reduce(Fn fn, ValueType seed) { return [fn, seed] (auto&& seq) { return reduce(fn, seq, seed); }; }
+
+
+
+
+
+template<typename ValueType, std::size_t Rank>
+auto sq::sum(const sequence_t<ValueType, Rank>& seq)
+{
+    return reduce(std::plus<>(), seq, ValueType(0));
+}
+auto sq::sum() { return [] (auto&& seq) { return sum(seq); }; }
+
+
+
+
+template<typename ValueType, std::size_t Rank>
+auto sq::product(const sequence_t<ValueType, Rank>& seq)
+{
+    return reduce(std::multiplies<>(), seq, ValueType(1));
+}
+auto sq::product() { return [] (auto&& seq) { return product(seq); }; }
+
+
+
+
+template<typename ValueType, typename Predicate, std::size_t Rank>
+auto sq::all_of(const sequence_t<ValueType, Rank>& seq, Predicate pred)
+{
+    for (std::size_t i = 0; i < Rank; ++i)
+        if (! pred(seq[i]))
+            return false;
+    return true;
+}
+
+
+
+
+template<typename ValueType, typename Predicate, std::size_t Rank>
+auto sq::any_of(const sequence_t<ValueType, Rank>& seq, Predicate pred)
+{
+    for (std::size_t i = 0; i < Rank; ++i)
+        if (pred(seq[i]))
+            return true;
+    return false;
+}
+
+
+
+
+/**
+ * @brief      Read indexes from a sequence.
+ *
+ * @param[in]  seq         The sequence to read from
+ * @param[in]  indexes     The indexes to read
+ *
+ * @tparam     ValueType   The value type
+ * @tparam     Rank        The rank of the starting sequence
+ * @tparam     NumIndexes  The number of indexes to read
+ *
+ * @return     A new sequence
+ */
+template<typename ValueType, std::size_t Rank, std::size_t NumIndexes>
+auto sq::read_indexes(const sequence_t<ValueType, Rank>& seq, const sequence_t<std::size_t, NumIndexes>& indexes)
+{
+    auto result = sequence_t<ValueType, NumIndexes>();
+
+    for (std::size_t i = 0; i < NumIndexes; ++i)
+        result[i] = seq.at(indexes[i]);
+
+    return result;
+}
+
+template<typename... Args>
+auto sq::read_indexes(Args... args)
+{
+    return [indexes = make_sequence(std::size_t(args)...)] (auto&& seq) { return read_indexes(seq, indexes); };
+}
+
+
+
+
+/**
+ * @brief      Return a sequence with new elements inserted at the given
+ *             indexes.
+ *
+ * @param[in]  source       The starting sequence
+ * @param[in]  values       The elements to insert
+ * @param[in]  indexes      The indexes at which to insert the new elements
+ *
+ * @tparam     ValueType    The value type
+ * @tparam     Rank         The rank of the starting sequence
+ * @tparam     NumToInsert  The number of elements being inserted
+ *
+ * @return     A lengthened sequence
+ * @note       If an index is greater than rank, or if the indexes are not
+ *             unique, this function throws out-of-range.
+ */
+template<typename ValueType, std::size_t Rank, std::size_t NumToInsert>
+auto sq::insert_elements(
+    const sequence_t<ValueType, Rank>& source,
+    const sequence_t<ValueType, NumToInsert>& values,
+    const sequence_t<std::size_t, NumToInsert>& indexes)
+{
+    auto source1_n = std::size_t(0);
+    auto source2_n = std::size_t(0);
+    auto result = sequence_t<ValueType, Rank + NumToInsert>();
+
+    for (std::size_t n = 0; n < result.size(); ++n)
+    {
+        if (std::find(std::begin(indexes), std::end(indexes), n) == std::end(indexes))
+        {
+            result[n] = source[source1_n++];
+        }
+        else
+        {
+            result[n] = values[source2_n++];
+        }
+    }
+
+    if (source2_n != NumToInsert)
+    {
+        throw std::out_of_range("sq::insert_elements");
+    }
+    return result;
+}
+
+
+
+
+/**
+ * @brief      Return a sequence with the elements at the given indexes removed.
+ *
+ * @param[in]  source       The starting sequence
+ * @param[in]  indexes      The indexes to remove
+ *
+ * @tparam     ValueType    The value type
+ * @tparam     Rank         The rank of the starting sequence
+ * @tparam     NumToRemove  The number of indexes being removed
+ *
+ * @return     A shortened sequence
+ * @note       This function throws out-of-range if any of the indexes are
+ *             greater than or equal to Rank.
+ */
+template<typename ValueType, std::size_t Rank, std::size_t NumToRemove>
+auto sq::remove_indexes(
+    const sequence_t<ValueType, Rank>& source,
+    const sequence_t<std::size_t, NumToRemove>& indexes)
+{
+    static_assert(NumToRemove <= Rank, "cannot remove more elements than sequence size");
+
+    auto target_n = std::size_t(0);
+    auto result = sequence_t<ValueType, Rank - NumToRemove>();
+
+    for (std::size_t n = 0; n < source.size(); ++n)
+    {
+        if (std::find(std::begin(indexes), std::end(indexes), n) == std::end(indexes))
+        {
+            result[target_n++] = source[n];
+        }
+    }
+
+    if (target_n != result.size())
+    {
+        throw std::out_of_range("sq::remove_elements");
+    }
+    return result;
+}

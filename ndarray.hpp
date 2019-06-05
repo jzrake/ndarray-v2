@@ -1161,7 +1161,7 @@ public:
             throw std::logic_error("out-of-bounds selection");
         }
         auto mapping = [region=region, array] (auto&& index) { return array(region.map_index(index)); };
-        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, region.shape()));
+        return make_array(mapping, region.shape());
     }
 
     template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
@@ -1834,7 +1834,7 @@ template<std::size_t Rank>
 auto nd::index_array(shape_t<Rank> shape)
 {
     auto mapping = [] (auto&& index) { return index; };
-    return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, shape));
+    return make_array(mapping, shape);
 }
 
 template<typename... Args>
@@ -2526,7 +2526,6 @@ auto nd::binary_op(Function function)
 /**
  * @brief      The actual array class template
  *
- * @tparam     Rank      The array dimensionality
  * @tparam     Provider  Type defining the index space and mapping from indexes
  *                       to values
  */
