@@ -691,7 +691,16 @@ auto sq::reduce(Fn fn, ValueType seed) { return [fn, seed] (auto&& seq) { return
 
 
 
-
+/**
+ * @brief      Specializes reduce with std::plus.
+ *
+ * @param[in]  seq        The sequence to sum
+ *
+ * @tparam     ValueType  The sequence value type
+ * @tparam     Rank       The sequence rank
+ *
+ * @return     The sum of the elements
+ */
 template<typename ValueType, std::size_t Rank>
 auto sq::sum(const sequence_t<ValueType, Rank>& seq)
 {
@@ -702,6 +711,16 @@ auto sq::sum() { return [] (auto&& seq) { return sum(seq); }; }
 
 
 
+/**
+ * @brief      Specializes reduce with std::multiplies.
+ *
+ * @param[in]  seq        The sequence whose product is computed
+ *
+ * @tparam     ValueType  The sequence value type
+ * @tparam     Rank       The sequence rank
+ *
+ * @return     The product of the elements
+ */
 template<typename ValueType, std::size_t Rank>
 auto sq::product(const sequence_t<ValueType, Rank>& seq)
 {
@@ -712,6 +731,19 @@ auto sq::product() { return [] (auto&& seq) { return product(seq); }; }
 
 
 
+/**
+ * @brief      Return whether all of the elements of a sequence satisfy the
+ *             given predicate.
+ *
+ * @param[in]  seq        The sequence to test
+ * @param[in]  pred       The predicate function
+ *
+ * @tparam     ValueType  The value type
+ * @tparam     Predicate  The type of the predicate function
+ * @tparam     Rank       The rank of the starting sequence
+ *
+ * @return     A boolean
+ */
 template<typename ValueType, typename Predicate, std::size_t Rank>
 auto sq::all_of(const sequence_t<ValueType, Rank>& seq, Predicate pred)
 {
@@ -724,6 +756,19 @@ auto sq::all_of(const sequence_t<ValueType, Rank>& seq, Predicate pred)
 
 
 
+/**
+ * @brief      Return whether any of the elements of a sequence satisfy the
+ *             given predicate.
+ *
+ * @param[in]  seq        The sequence to test
+ * @param[in]  pred       The predicate function
+ *
+ * @tparam     ValueType  The value type
+ * @tparam     Predicate  The type of the predicate function
+ * @tparam     Rank       The rank of the starting sequence
+ *
+ * @return     A boolean
+ */
 template<typename ValueType, typename Predicate, std::size_t Rank>
 auto sq::any_of(const sequence_t<ValueType, Rank>& seq, Predicate pred)
 {

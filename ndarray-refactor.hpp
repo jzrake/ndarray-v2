@@ -81,44 +81,25 @@ struct nd2::shape_t
     bool operator!=(const shape_t& other) const { return seq != other.seq; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
 
-    std::size_t volume() const
+    std::size_t volume() const { return sq::product(seq); }
+    index_t<Rank> last_index() const { return seq; }
+
+    bool contains(const index_t<Rank>& index) const { return sq::all_of(sq::zip(index.seq, seq), detail::apply_to(std::less<>())); }
+    template<typename... Args> bool contains(Args... args) const { return contains(make_index(args...)); }
+
+    template<std::size_t N> auto select(const sq::sequence_t<std::size_t, N>& indexes) const { return shape_t<N>(sq::read_indexes(seq, indexes)); }
+    template<typename... Args> auto select(Args... args) const { return select(sq::make_sequence(std::size_t(args)...)); }
+
+    template<std::size_t N> auto remove(const sq::sequence_t<std::size_t, N>& is) const { return shape_t<Rank - N>(sq::remove_indexes(seq, is)); }
+    template<typename... Args> auto remove(Args... args) const { return remove(sq::make_sequence(std::size_t(args)...)); }
+
+    template<std::size_t NumElements>
+    auto insert(
+        const sq::sequence_t<std::size_t, NumElements>& elements,
+        const sq::sequence_t<std::size_t, NumElements>& indexes) const
     {
-        return sq::product(seq);
+        return shape_t<Rank + NumElements>(sq::insert_elements(seq, elements, indexes));
     }
-
-    index_t<Rank> last_index() const
-    {
-        return seq;
-    }
-
-    bool contains(const index_t<Rank>& index) const
-    {
-        return sq::all_of(sq::zip(index.seq, seq), detail::apply_to(std::less<>()));
-    }
-
-    template<typename... Args>
-    bool contains(Args... args) const
-    {
-        return contains(make_index(args...));
-    }
-
-    // template<typename IndexContainer>
-    // auto read_elements(IndexContainer indexes) const
-    // {
-    //     return detail::read_elements<shape_t<indexes.size()>>(*this, indexes);
-    // }
-
-    // template<typename IndexContainer, typename Sequence>
-    // auto insert_elements(IndexContainer indexes, Sequence values) const
-    // {
-    //     return detail::insert_elements<shape_t<Rank + indexes.size()>>(*this, indexes, values);
-    // }
-
-    // template<typename IndexContainer>
-    // auto remove_elements(IndexContainer indexes) const
-    // {
-    //     return detail::remove_elements<shape_t<Rank - indexes.size()>>(*this, indexes);
-    // }
 
     sq::sequence_t<std::size_t, Rank> seq;
 };

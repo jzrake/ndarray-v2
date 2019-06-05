@@ -107,13 +107,16 @@ TEST_CASE("shapes can be constructed", "[shape]")
     REQUIRE(shape1 == nd2::uniform_shape<3>(10));
 }
 
-TEST_CASE("shapes methods work correctly", "[shape]")
+TEST_CASE("shape methods work correctly", "[shape]")
 {
     auto shape = nd2::make_shape(2, 4, 8, 16);
     REQUIRE(shape.volume() == 2 * 4 * 8 * 16);
     REQUIRE(shape.contains(nd2::make_index(1, 1, 1, 1)));
     REQUIRE_FALSE(shape.contains(2, 1, 1, 1));
     REQUIRE(shape.last_index() == nd2::make_index(2, 4, 8, 16));
+    REQUIRE(shape.select(1, 2) == nd2::make_shape(4, 8));
+    REQUIRE(shape.remove(1, 2) == nd2::make_shape(2, 16));
+    REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(8, 9, 2, 4, 8, 16));
 }
 
 
