@@ -191,11 +191,11 @@ TEST_CASE("array can be zipped together", "[array]")
 {
     auto a = nd2::range(10);
     auto b = nd2::linspace(0.0, 1.0, 10);
-    REQUIRE(nd2::zip_arrays(a, b)(0) == std::make_tuple(a(0), b(0)));
-    REQUIRE(nd2::zip_arrays(a, b)(9) == std::make_tuple(a(9), b(9)));
-    REQUIRE_THROWS(nd2::zip_arrays(nd2::range(10), nd2::range(11)));
+    REQUIRE(nd2::zip(a, b)(0) == std::make_tuple(a(0), b(0)));
+    REQUIRE(nd2::zip(a, b)(9) == std::make_tuple(a(9), b(9)));
+    REQUIRE_THROWS(nd2::zip(nd2::range(10), nd2::range(11)));
 
-    auto [a1, b1] = nd2::unzip_array(nd2::zip_arrays(a, b));
+    auto [a1, b1] = nd2::unzip(nd2::zip(a, b));
     REQUIRE(a1(0) == a(0));
     REQUIRE(b1(0) == b(0));
 }
@@ -207,6 +207,22 @@ TEST_CASE("array can be created as a cartesian product", "[array]")
     REQUIRE(nd2::cartesian_product(a, b)(0, 0) == std::make_tuple(0, 0.0));
     REQUIRE(nd2::cartesian_product(a, b)(1, 0) == std::make_tuple(1, 0.0));
     REQUIRE(nd2::cartesian_product(a, b)(0, 1) == std::make_tuple(0, b(1)));
+}
+
+TEST_CASE("arrays can be mapped / applied", "[array]")
+{
+    auto a = nd2::linspace(0.0, 1.0, 20);
+    REQUIRE((a | nd2::map([] (auto x) { return x + 1; }) | nd2::read_index(19)) == 2.0);
+    REQUIRE((nd2::zip(a, a) | nd2::apply(std::plus<>()) | nd2::read_index(19)) == 2.0);
+}
+
+TEST_CASE("array arithmetic operators work", "[array]")
+{
+    auto a = nd2::linspace(0.0, 1.0, 20);
+    REQUIRE((a + a)(19) == 2.0);
+    REQUIRE((a + 1)(19) == 2.0);
+    REQUIRE((1 + a)(19) == 2.0);
+    REQUIRE_THROWS(a + nd2::linspace(0.0, 1.0, 21));
 }
 
 

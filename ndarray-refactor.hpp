@@ -72,18 +72,21 @@ namespace nd2
 
     // array factories
     //=========================================================================
-    template<typename Provider> auto make_array(Provider provider);
-    template<typename Mapping, std::size_t Rank> auto make_array(Mapping mapping, shape_t<Rank> shape);
-    template<typename ValueType=int, typename... Args> auto zeros(Args... args);
-    template<typename ValueType=int, typename... Args> auto ones(Args... args);
     inline auto range(int count);
     inline auto range(int start, int final, int step=1);
     inline auto linspace(double x0, double x1, std::size_t count);
-
-    template<typename... ArrayTypes> auto zip_arrays(ArrayTypes... arrays);
-    template<typename ArrayType> auto unzip_array(ArrayType array);
-
-    template<typename... ArrayTypes> auto cartesian_product(ArrayTypes... arrays);
+    template<typename Provider>                        auto make_array(Provider provider);
+    template<typename Mapping, std::size_t Rank>       auto make_array(Mapping mapping, shape_t<Rank> shape);
+    template<typename ValueType=int, typename... Args> auto zeros(Args... args);
+    template<typename ValueType=int, typename... Args> auto ones(Args... args);
+    template<typename ArgType, std::size_t Rank>       auto promote(ArgType, shape_t<Rank>);
+    template<typename ArrayType>                       auto unzip(ArrayType array);
+    template<typename... ArrayTypes>                   auto zip(ArrayTypes... arrays);
+    template<typename... ArrayTypes>                   auto cartesian_product(ArrayTypes... arrays);
+    template<std::size_t Rank>                         auto read_index(index_t<Rank> index_to_read);
+    template<typename... Args>                         auto read_index(Args... args);
+    template<typename Function>                        auto map(Function function);
+    template<typename Function>                        auto apply(Function fn);
 }
 
 
@@ -94,6 +97,12 @@ namespace nd2::detail
 {
     template<typename Fn>
     auto apply_to(Fn fn) { return [fn] (auto t) { return std::apply(fn, t); }; }
+
+    template <typename T, typename = void>
+    struct has_typedef_is_ndarray : std::false_type {};
+
+    template <typename T>
+    struct has_typedef_is_ndarray<T, std::void_t<typename T::is_ndarray>> : std::true_type {};
 }
 
 
@@ -494,8 +503,13 @@ public:
     template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
     template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
 
+    // methods converting this to a memory-backed array
+    //=========================================================================
+    // auto unique() const { return make_array(evaluate_as_unique(provider)); }
+    // auto shared() const { return make_array(evaluate_as_shared(provider)); }
 
 private:
+    //=========================================================================
     Provider provider;
 };
 
@@ -637,46 +651,6 @@ auto nd2::make_array(Mapping mapping, shape_t<Rank> shape)
 
 
 /**
- * @brief      Return an array of zeros with the given shape
- *
- * @param[in]  args       shape arguments
- *
- * @tparam     ValueType  Defaults to int; use e.g. zeros<double>(...) for other
- *                        types
- * @tparam     Args       Argument types (should be a positive integral type)
- *
- * @return     An array of zeros, not requiring any storage
- */
-template<typename ValueType, typename... Args>
-auto nd2::zeros(Args... args)
-{
-    return make_array([] (auto) { return ValueType(0); }, make_shape(args...));
-}
-
-
-
-
-/**
- * @brief      Return an array of ones with the given shape
- *
- * @param[in]  args       shape arguments
- *
- * @tparam     ValueType  Defaults to int; use e.g. ones<double>(...) for other
- *                        types
- * @tparam     Args       Argument types (should be a positive integral type)
- *
- * @return     An array of ones, not requiring any storage
- */
-template<typename ValueType, typename... Args>
-auto nd2::ones(Args... args)
-{
-    return make_array([] (auto) { return ValueType(1); }, make_shape(args...));
-}
-
-
-
-
-/**
  * @brief      Return a 1d array [0 .. count - 1]
  *
  * @param[in]  count  The number of elements
@@ -737,29 +711,68 @@ auto nd2::linspace(double x0, double x1, std::size_t count)
 
 
 /**
- * @brief      Zip a sequence identically-shaped arrays together
+ * @brief      Return an array of zeros with the given shape
  *
- * @param      arrays      The arrays
+ * @param[in]  args       shape arguments
  *
- * @tparam     ArrayTypes  The types of the arrays
+ * @tparam     ValueType  Defaults to int; use e.g. zeros<double>(...) for other
+ *                        types
+ * @tparam     Args       Argument types (should be a positive integral type)
  *
- * @return     An array which returns tuples taken from the underlying arrays
+ * @return     An array of zeros, not requiring any storage
  */
-template<typename... ArrayTypes>
-auto nd2::zip_arrays(ArrayTypes... arrays)
+template<typename ValueType, typename... Args>
+auto nd2::zeros(Args... args)
 {
-    constexpr std::size_t Ranks[] = {ArrayTypes::rank...};
-    shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
+    return make_array([] (auto) { return ValueType(0); }, make_shape(args...));
+}
 
-    if (std::adjacent_find(std::begin(shapes), std::end(shapes), std::not_equal_to<>()) != std::end(shapes))
+
+
+
+/**
+ * @brief      Return an array of ones with the given shape
+ *
+ * @param[in]  args       shape arguments
+ *
+ * @tparam     ValueType  Defaults to int; use e.g. ones<double>(...) for other
+ *                        types
+ * @tparam     Args       Argument types (should be a positive integral type)
+ *
+ * @return     An array of ones, not requiring any storage
+ */
+template<typename ValueType, typename... Args>
+auto nd2::ones(Args... args)
+{
+    return make_array([] (auto) { return ValueType(1); }, make_shape(args...));
+}
+
+
+
+
+/**
+ * @brief      Try to promote the argument to an array of the given shape
+ *
+ * @param      arg    The argument
+ * @param[in]  shape  The shape
+ *
+ * @tparam     Arg    The argument type
+ * @tparam     Rank   The rank of the shape to promote the argument to
+ *
+ * @return     An array with the given shape
+ */
+
+template<typename ArgType, std::size_t Rank>
+auto nd2::promote(ArgType arg, shape_t<Rank> shape)
+{
+    if constexpr (detail::has_typedef_is_ndarray<ArgType>::value)
     {
-        throw std::logic_error("cannot zip arrays with different shapes");
+        return arg;
     }
-    auto mapping = [arrays...] (auto&& index)
+    else
     {
-        return std::make_tuple(arrays(index)...);
-    };
-    return make_array(mapping, shapes[0]);
+        return make_array([arg] (auto) { return arg; }, shape);
+    }
 }
 
 
@@ -775,7 +788,7 @@ auto nd2::zip_arrays(ArrayTypes... arrays)
  * @return     The tuple of arrays
  */
 template<typename ArrayType>
-auto nd2::unzip_array(ArrayType array)
+auto nd2::unzip(ArrayType array)
 {
     auto get_through = [array] (auto i)
     {
@@ -785,6 +798,35 @@ auto nd2::unzip_array(ArrayType array)
     {
         return std::make_tuple(get_through(is)...);
     });
+}
+
+
+
+
+/**
+ * @brief      Zip a sequence identically-shaped arrays together
+ *
+ * @param      arrays      The arrays
+ *
+ * @tparam     ArrayTypes  The types of the arrays
+ *
+ * @return     An array which returns tuples taken from the underlying arrays
+ */
+template<typename... ArrayTypes>
+auto nd2::zip(ArrayTypes... arrays)
+{
+    constexpr std::size_t Ranks[] = {ArrayTypes::rank...};
+    shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
+
+    if (std::adjacent_find(std::begin(shapes), std::end(shapes), std::not_equal_to<>()) != std::end(shapes))
+    {
+        throw std::logic_error("cannot zip arrays with different shapes");
+    }
+    auto mapping = [arrays...] (auto&& index)
+    {
+        return std::make_tuple(arrays(index)...);
+    };
+    return make_array(mapping, shapes[0]);
 }
 
 
@@ -812,4 +854,128 @@ auto nd2::cartesian_product(ArrayTypes... arrays)
         });
     };
     return make_array(mapping, make_shape(arrays.size()...));
+}
+
+
+
+
+
+/**
+ * @brief      Reads an index from an array.
+ *
+ * @param[in]  index_to_read  The index to read
+ *
+ * @tparam     Rank           The rank of the array that can be read from
+ *
+ * @return     The operator
+ */
+template<std::size_t Rank>
+auto nd2::read_index(index_t<Rank> index_to_read)
+{
+    return [index_to_read] (auto&& array)
+    {
+        return array(index_to_read);
+    };
+}
+template<typename... Args>
+auto nd2::read_index(Args... args)
+{
+    return read_index(make_index(args...));
+}
+
+
+
+
+/**
+ * @brief      Return an operator that maps the values of an array using the
+ *             given function object.
+ *
+ * @param      function  The function
+ *
+ * @tparam     Function  The type of the function object
+ *
+ * @return     The operator
+ * 
+ * @note       This is the N-dimensional version of the transform operator
+ */
+template<typename Function>
+auto nd2::map(Function function)
+{
+    return [function] (auto array)
+    {
+        auto mapping = [array, function] (auto&& index) { return function(array(index)); };
+        return make_array(mapping, array.shape());
+    };
+}
+
+
+
+
+/**
+ * @brief      Return an operator that calls std::apply(fn, arg) for each arg in
+ *             the operand array. The value type of that array must be some type
+ *             of std::tuple.
+ *
+ * @param[in]  fn        The function
+ *
+ * @tparam     Function  The type of the function object
+ *
+ * @return     The operator
+ */
+template<typename Function>
+auto nd2::apply(Function fn)
+{
+    return [fn] (auto array)
+    {
+        return array | nd::map([fn] (auto args) { return std::apply(fn, args); });
+    };
+}
+
+
+
+
+//=============================================================================
+namespace nd2
+{
+    template<typename P> auto operator-(const array_t<P>& a) { return a | map(std::negate<>()); }
+    template<typename P> auto operator!(const array_t<P>& a) { return a | map(std::logical_not<>()); }
+
+    template<typename P1, typename P2> auto operator&&(const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::logical_and<>()); }
+    template<typename P1, typename P2> auto operator||(const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::logical_or<>()); }
+    template<typename P1, typename P2> auto operator==(const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::equal_to<>()); }
+    template<typename P1, typename P2> auto operator!=(const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::not_equal_to<>()); }
+    template<typename P1, typename P2> auto operator<=(const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::less_equal<>()); }
+    template<typename P1, typename P2> auto operator>=(const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::greater_equal<>()); }
+    template<typename P1, typename P2> auto operator< (const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::less<>()); }
+    template<typename P1, typename P2> auto operator> (const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::greater<>()); }
+    template<typename P1, typename P2> auto operator+ (const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::plus<>()); }
+    template<typename P1, typename P2> auto operator- (const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::minus<>()); }
+    template<typename P1, typename P2> auto operator* (const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::multiplies<>()); }
+    template<typename P1, typename P2> auto operator/ (const array_t<P1>& a, const array_t<P2>& b) { return zip(a, b) | apply(std::divides<>()); }
+
+    template<typename P, typename T> auto operator&&(const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::logical_and<>()); }
+    template<typename P, typename T> auto operator||(const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::logical_or<>()); }
+    template<typename P, typename T> auto operator==(const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::equal_to<>()); }
+    template<typename P, typename T> auto operator!=(const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::not_equal_to<>()); }
+    template<typename P, typename T> auto operator<=(const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::less_equal<>()); }
+    template<typename P, typename T> auto operator>=(const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::greater_equal<>()); }
+    template<typename P, typename T> auto operator< (const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::less<>()); }
+    template<typename P, typename T> auto operator> (const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::greater<>()); }
+    template<typename P, typename T> auto operator+ (const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::plus<>()); }
+    template<typename P, typename T> auto operator- (const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::minus<>()); }
+    template<typename P, typename T> auto operator* (const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::multiplies<>()); }
+    template<typename P, typename T> auto operator/ (const array_t<P>& a, const T& b) { return zip(a, promote(b, a.shape())) | apply(std::divides<>()); }
+
+    template<typename T, typename P> auto operator&&(const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::logical_and<>()); }
+    template<typename T, typename P> auto operator||(const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::logical_or<>()); }
+    template<typename T, typename P> auto operator==(const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::equal_to<>()); }
+    template<typename T, typename P> auto operator!=(const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::not_equal_to<>()); }
+    template<typename T, typename P> auto operator<=(const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::less_equal<>()); }
+    template<typename T, typename P> auto operator>=(const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::greater_equal<>()); }
+    template<typename T, typename P> auto operator< (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::less<>()); }
+    template<typename T, typename P> auto operator> (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::greater<>()); }
+    template<typename T, typename P> auto operator+ (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::plus<>()); }
+    template<typename T, typename P> auto operator- (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::minus<>()); }
+    template<typename T, typename P> auto operator* (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::multiplies<>()); }
+    template<typename T, typename P> auto operator/ (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::divides<>()); }
 }
