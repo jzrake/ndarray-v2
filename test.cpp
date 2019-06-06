@@ -31,65 +31,6 @@ TEST_CASE("shapes support insertion and removal of elements")
     REQUIRE(shape.insert_elements(nd::make_index(3, 4), nd::make_shape(8, 9)) == nd::make_shape(0, 1, 2, 8, 9));
 }
 
-TEST_CASE("can zip, transform, enumerate a range", "[range] [transform] [zip] [divvy]")
-{
-    auto n = 0;
-
-    for (auto a : nd::range(10) | nd::transform([] (auto a) { return 2 * a; }))
-    {
-        REQUIRE(a == 2 * n);
-        ++n;
-    }
-    for (auto&& [m, n] : nd::zip(nd::range(10), nd::range(10)))
-    {
-        REQUIRE(m == n);
-    }
-    for (auto&& [m, n] : enumerate(nd::range(10)))
-    {
-        REQUIRE(m == n);
-    }
-
-    REQUIRE(nd::divvy(10)(nd::range(10)).size() == 10);
-    REQUIRE(nd::divvy(4)(nd::range(100)).size() == 4);
-    REQUIRE(nd::divvy(3)(nd::range(100)).size() == 3);
-
-    n = 0;
-
-    for (auto group : nd::range(20) | nd::divvy(3))
-    {
-        for (auto item : group)
-        {
-            REQUIRE(item == n);
-            ++n;
-        }
-    }
-    REQUIRE(n == 20);
-
-    n = 0;
-
-    for (auto group : nd::range(20) | nd::divvy(5))
-    {
-        for (auto item : group)
-        {
-            REQUIRE(item == n);
-            ++n;
-        }
-    }
-    REQUIRE(n == 20);
-
-    n = 0;
-
-    for (auto group : nd::range(20) | nd::divvy(22))
-    {
-        for (auto item : group)
-        {
-            REQUIRE(item == n);
-            ++n;
-        }
-    }
-    REQUIRE(n == 20);
-}
-
 TEST_CASE("range can be constructed", "[distance] [enumerate] [range]")
 {
     REQUIRE(nd::distance(nd::enumerate(nd::range(10))) == 10);
