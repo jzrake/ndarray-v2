@@ -273,8 +273,7 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
         REQUIRE(A(0, 0, 3) == 3);
         REQUIRE(A(1, 2, 3) == 123);
         REQUIRE(A.data() == data);
-
-        static_assert(std::is_same<decltype(A)::provider_type, nd::unique_provider_t<3, double>>::value);
+        static_assert(std::is_same<decltype(A)::provider_type, nd::unique_provider_t<double, 3>>::value);
     }
     SECTION("can copy a mutable version of the provider into an array and get different data")
     {
