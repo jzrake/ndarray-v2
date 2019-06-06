@@ -188,18 +188,6 @@ struct nd::index_t
     bool operator<=(const index_t<Rank>& other) const { return sq::all_of(sq::zip(seq, other.seq), detail::apply_to(std::less_equal<>())); }
     bool operator>=(const index_t<Rank>& other) const { return sq::all_of(sq::zip(seq, other.seq), detail::apply_to(std::greater_equal<>())); }
 
-    std::size_t volume() const { return sq::product(seq); }
-    index_t<Rank> last_index() const { return seq; }
-
-    bool contains(const index_t<Rank>& index) const { return sq::all_of(sq::zip(index.seq, seq), detail::apply_to(std::less<>())); }
-    template<typename... Args> bool contains(Args... args) const { return contains(make_index(args...)); }
-
-    template<std::size_t N> auto select(const sq::sequence_t<std::size_t, N>& indexes) const { return index_t<N>(sq::read_indexes(seq, indexes)); }
-    template<typename... Args> auto select(Args... args) const { return select(sq::make_sequence(std::size_t(args)...)); }
-
-    template<std::size_t N> auto remove(const sq::sequence_t<std::size_t, N>& is) const { return index_t<Rank - N>(sq::remove_indexes(seq, is)); }
-    template<typename... Args> auto remove(Args... args) const { return remove(sq::make_sequence(std::size_t(args)...)); }
-
     template<std::size_t NumElements>
     auto insert(
         const sq::sequence_t<std::size_t, NumElements>& elements,
@@ -1567,6 +1555,38 @@ auto nd::where(ArrayType array)
 //=============================================================================
 namespace nd
 {
+    // extended operator support structs
+    //=========================================================================
+    /**/                                           class axis_shifter_t;
+    /**/                                           class axis_selector_t;
+    template<std::size_t RankDifference>           class axis_freezer_t;
+    template<typename ArrayType>                   class axis_reducer_t;
+    template<std::size_t Rank, typename ArrayType> class replacer_t;
+    template<std::size_t Rank>                     class selector_t;
+    template<typename ArrayType>                   class concatenator_t;
+
+    // extended operators
+    //=========================================================================
+    inline                                         auto shift_by(int delta);
+    inline                                         auto freeze_axis(std::size_t axis_to_freeze);
+    inline                                         auto select_axis(std::size_t axis_to_select);
+    template<std::size_t Rank>                     auto select_from(index_t<Rank> starting_index);
+    template<typename... Args>                     auto select_from(Args... args);
+    template<std::size_t Rank>                     auto select(access_pattern_t<Rank>);
+    template<typename OperatorType>                auto collect(OperatorType reduction);
+    template<typename ArrayType>                   auto concat(ArrayType array_to_concat);
+    template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType);
+    template<std::size_t Rank>                     auto replace_from(index_t<Rank> starting_index);
+    template<typename... Args>                     auto replace_from(Args... args);
+    template<std::size_t Rank>                     auto reshape(shape_t<Rank> shape);
+    template<typename... Args>                     auto reshape(Args... args);
+
+    // to_string overloads
+    //=========================================================================
+    template<std::size_t Rank> auto to_string(const index_t<Rank>& index);
+    template<std::size_t Rank> auto to_string(const shape_t<Rank>& index);
+    template<std::size_t Rank> auto to_string(const access_pattern_t<Rank>& region);
+
     // arithmetic operators
     //=========================================================================
     template<typename P> auto operator-(const array_t<P>& a) { return a | map(std::negate<>()); }
@@ -1610,50 +1630,18 @@ namespace nd
     template<typename T, typename P> auto operator- (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::minus<>()); }
     template<typename T, typename P> auto operator* (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::multiplies<>()); }
     template<typename T, typename P> auto operator/ (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::divides<>()); }
-
-    // extended operator support structs
-    //=========================================================================
-    class shifter_t;
-    class axis_selector_t;
-    template<std::size_t Rank> class selector_t;
-    template<std::size_t Rank, typename ArrayType> class replacer_t;
-    template<std::size_t RankDifference> class axis_freezer_t;
-    template<typename ArrayType> class axis_reducer_t;
-    template<typename ArrayType> class concatenator_t;
-
-    // extended operators
-    //=========================================================================
-    inline                                         auto shift_by(int delta);
-    inline                                         auto freeze_axis(std::size_t axis_to_freeze);
-    inline                                         auto select_axis(std::size_t axis_to_select);
-    template<std::size_t Rank>                     auto select_from(index_t<Rank> starting_index);
-    template<typename... Args>                     auto select_from(Args... args);
-    template<std::size_t Rank>                     auto select(access_pattern_t<Rank>);
-    template<typename OperatorType>                auto collect(OperatorType reduction);
-    template<typename ArrayType>                   auto concat(ArrayType array_to_concat);
-    template<std::size_t Rank, typename ArrayType> auto replace(access_pattern_t<Rank>, ArrayType);
-    template<std::size_t Rank>                     auto replace_from(index_t<Rank> starting_index);
-    template<typename... Args>                     auto replace_from(Args... args);
-    template<std::size_t Rank>                     auto reshape(shape_t<Rank> shape);
-    template<typename... Args>                     auto reshape(Args... args);
-
-    // to_string overloads
-    //=========================================================================
-    template<std::size_t Rank> auto to_string(const index_t<Rank>& index);
-    template<std::size_t Rank> auto to_string(const shape_t<Rank>& index);
-    template<std::size_t Rank> auto to_string(const access_pattern_t<Rank>& region);
 }
 
 
 
 
 //=============================================================================
-class nd::shifter_t
+class nd::axis_shifter_t
 {
 public:
 
     //=========================================================================
-    shifter_t(std::size_t axis_to_shift, int delta) : axis_to_shift(axis_to_shift), delta(delta) {}
+    axis_shifter_t(std::size_t axis_to_shift, int delta) : axis_to_shift(axis_to_shift), delta(delta) {}
 
     template<typename ArrayType>
     auto operator()(ArrayType&& array) const
@@ -1679,7 +1667,7 @@ public:
 
     auto along_axis(std::size_t new_axis_to_shift) const
     {
-        return shifter_t(new_axis_to_shift, delta);
+        return axis_shifter_t(new_axis_to_shift, delta);
     }
 
 private:
@@ -1741,94 +1729,6 @@ private:
     std::size_t start;
     std::size_t final;
     bool is_final_from_the_end;
-};
-
-
-
-
-//=============================================================================
-template<std::size_t Rank>
-class nd::selector_t
-{
-public:
-
-    //=========================================================================
-    selector_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
-
-    template<typename ArrayType>
-    auto operator()(ArrayType&& array) const
-    {
-        if (! region.within(array.shape()))
-        {
-            throw std::logic_error("out-of-bounds selection");
-        }
-        auto mapping = [region=region, array] (auto&& index) { return array(region.map_index(index)); };
-        return make_array(mapping, region.shape());
-    }
-
-    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
-    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
-    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
-    auto from   (index_t<Rank> arg) const { return selector_t(region.with_start(arg)); }
-    auto to     (index_t<Rank> arg) const { return selector_t(region.with_final(arg)); }
-    auto jumping(jumps_t<Rank> arg) const { return selector_t(region.with_jumps(arg)); }
-
-private:
-    //=========================================================================
-    access_pattern_t<Rank> region;
-};
-
-
-
-
-//=============================================================================
-template<std::size_t Rank, typename ArrayType>
-class nd::replacer_t
-{
-public:
-
-    //=========================================================================
-    replacer_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
-    replacer_t(access_pattern_t<Rank> region, ArrayType replacement_array)
-    : region(region)
-    , replacement_array(replacement_array) {}
-
-    template<typename PatchArrayType>
-    auto operator()(PatchArrayType&& array_to_patch) const
-    {
-        if (region.shape() != replacement_array.shape())
-        {
-            throw std::logic_error("region to replace has a different shape than the replacement array");
-        }
-
-        auto mapping = [region=region, replacement_array=replacement_array, array_to_patch] (auto index)
-        {
-            if (region.generates(index))
-            {
-                return replacement_array(region.inverse_map_index(index));
-            }
-            return array_to_patch(index);
-        };
-        return make_array(mapping, array_to_patch.shape());
-    }
-
-    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
-    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
-    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
-    auto from   (index_t<Rank> arg) const { return replacer_t(region.with_start(arg), replacement_array); }
-    auto to     (index_t<Rank> arg) const { return replacer_t(region.with_final(arg), replacement_array); }
-    auto jumping(jumps_t<Rank> arg) const { return replacer_t(region.with_jumps(arg), replacement_array); }
-
-    template<typename OtherArrayType>
-    auto with(OtherArrayType&& new_replacement_array) const
-    {
-        return replacer_t<Rank, OtherArrayType>(region, std::forward<OtherArrayType>(new_replacement_array));
-    }
-
-private:
-    //=========================================================================
-    access_pattern_t<Rank> region;
-    ArrayType replacement_array;
 };
 
 
@@ -1978,6 +1878,94 @@ private:
 
 
 
+//=============================================================================
+template<std::size_t Rank, typename ArrayType>
+class nd::replacer_t
+{
+public:
+
+    //=========================================================================
+    replacer_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
+    replacer_t(access_pattern_t<Rank> region, ArrayType replacement_array)
+    : region(region)
+    , replacement_array(replacement_array) {}
+
+    template<typename PatchArrayType>
+    auto operator()(PatchArrayType&& array_to_patch) const
+    {
+        if (region.shape() != replacement_array.shape())
+        {
+            throw std::logic_error("region to replace has a different shape than the replacement array");
+        }
+
+        auto mapping = [region=region, replacement_array=replacement_array, array_to_patch] (auto index)
+        {
+            if (region.generates(index))
+            {
+                return replacement_array(region.inverse_map_index(index));
+            }
+            return array_to_patch(index);
+        };
+        return make_array(mapping, array_to_patch.shape());
+    }
+
+    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
+    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
+    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
+    auto from   (index_t<Rank> arg) const { return replacer_t(region.with_start(arg), replacement_array); }
+    auto to     (index_t<Rank> arg) const { return replacer_t(region.with_final(arg), replacement_array); }
+    auto jumping(jumps_t<Rank> arg) const { return replacer_t(region.with_jumps(arg), replacement_array); }
+
+    template<typename OtherArrayType>
+    auto with(OtherArrayType&& new_replacement_array) const
+    {
+        return replacer_t<Rank, OtherArrayType>(region, std::forward<OtherArrayType>(new_replacement_array));
+    }
+
+private:
+    //=========================================================================
+    access_pattern_t<Rank> region;
+    ArrayType replacement_array;
+};
+
+
+
+
+//=============================================================================
+template<std::size_t Rank>
+class nd::selector_t
+{
+public:
+
+    //=========================================================================
+    selector_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
+
+    template<typename ArrayType>
+    auto operator()(ArrayType&& array) const
+    {
+        if (! region.within(array.shape()))
+        {
+            throw std::logic_error("out-of-bounds selection");
+        }
+        auto mapping = [region=region, array] (auto&& index) { return array(region.map_index(index)); };
+        return make_array(mapping, region.shape());
+    }
+
+    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
+    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
+    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
+    auto from   (index_t<Rank> arg) const { return selector_t(region.with_start(arg)); }
+    auto to     (index_t<Rank> arg) const { return selector_t(region.with_final(arg)); }
+    auto jumping(jumps_t<Rank> arg) const { return selector_t(region.with_jumps(arg)); }
+
+private:
+    //=========================================================================
+    access_pattern_t<Rank> region;
+};
+
+
+
+
 /**
  * @brief      Return an operator that shifts an array along an axis
  *
@@ -1989,7 +1977,7 @@ private:
  */
 auto nd::shift_by(int delta)
 {
-    return shifter_t(0, delta);
+    return axis_shifter_t(0, delta);
 }
 
 
