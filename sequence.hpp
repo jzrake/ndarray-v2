@@ -61,19 +61,19 @@ namespace sq
 
     template<typename ValueType, std::size_t Rank>
     auto head(const sequence_t<ValueType, Rank>& seq);
-    auto head();
+    inline auto head();
 
     template<typename ValueType, std::size_t Rank>
     auto last(const sequence_t<ValueType, Rank>& seq);
-    auto last();
+    inline auto last();
 
     template<typename ValueType, std::size_t Rank>
     auto init(const sequence_t<ValueType, Rank>& seq);
-    auto init();
+    inline auto init();
 
     template<typename ValueType, std::size_t Rank>
     auto tail(const sequence_t<ValueType, Rank>& seq);
-    auto tail();
+    inline auto tail();
 
     template<std::size_t Index, typename ValueType, std::size_t Rank>
     auto partition(const sequence_t<ValueType, Rank>& seq);
@@ -87,7 +87,7 @@ namespace sq
 
     template<typename ValueType, std::size_t Rank>
     auto erase(const sequence_t<ValueType, Rank>& seq, std::size_t index);
-    auto erase(std::size_t index);
+    inline auto erase(std::size_t index);
 
     template<typename ValueType, std::size_t Rank>
     auto insert(const sequence_t<ValueType, Rank>& seq, std::size_t index, ValueType value_to_insert);
@@ -121,11 +121,11 @@ namespace sq
 
     template<typename ValueType, std::size_t Rank>
     auto sum(const sequence_t<ValueType, Rank>& seq);
-    auto sum();
+    inline auto sum();
 
     template<typename ValueType, std::size_t Rank>
     auto product(const sequence_t<ValueType, Rank>& seq);
-    auto product();
+    inline auto product();
 
     template<typename ValueType, typename Predicate, std::size_t Rank>
     auto all_of(const sequence_t<ValueType, Rank>& seq, Predicate pred);

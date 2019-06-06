@@ -77,6 +77,8 @@ namespace nd
     inline                                             auto range(int start, int final, int step=1);
     inline                                             auto linspace(double x0, double x1, std::size_t count);
     inline                                             auto divvy(std::size_t num_groups);
+    template<std::size_t Rank>                         auto index_array(shape_t<Rank> shape);
+    template<typename... Args>                         auto index_array(Args... args);
     template<typename Provider>                        auto make_array(Provider&& provider);
     template<typename Mapping, std::size_t Rank>       auto make_array(Mapping mapping, shape_t<Rank> shape);
     template<typename ValueType, std::size_t Rank>     auto make_shared_array(shape_t<Rank> shape);
@@ -110,6 +112,15 @@ namespace nd
     template<typename ArrayType> auto min(ArrayType&& array);
     template<typename ArrayType> auto max(ArrayType&& array);
     template<typename ArrayType> auto where(ArrayType array);
+
+
+    // convenience typedef's
+    //=========================================================================
+    template<typename ValueType, std::size_t Rank>
+    using shared_array = array_t<shared_provider_t<ValueType, Rank>>;
+
+    template<typename ValueType, std::size_t Rank>
+    using unique_array = array_t<unique_provider_t<ValueType, Rank>>;
 }
 
 
@@ -130,11 +141,11 @@ namespace nd::detail
     template <typename T>
     struct has_typedef_is_ndarray<T, std::void_t<typename T::is_ndarray>> : std::true_type {};
 
-template<std::size_t Index, typename ArrayType>
-static auto get_through(ArrayType array)
-{
-    return make_array([array] (auto index) { return std::get<Index>(array(index)); }, array.shape());
-};
+    template<std::size_t Index, typename ArrayType>
+    static auto get_through(ArrayType array)
+    {
+        return make_array([array] (auto index) { return std::get<Index>(array(index)); }, array.shape());
+    };
 }
 
 
@@ -151,7 +162,10 @@ struct nd::shape_t
     bool operator!=(const shape_t& other) const { return seq != other.seq; }
     std::size_t& operator[](std::size_t i) { return seq[i]; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
+    decltype(auto) begin() const { return seq.begin(); }
+    decltype(auto) end() const { return seq.end(); }
 
+    constexpr std::size_t size() const { return seq.size(); }
     std::size_t volume() const { return sq::product(seq); }
     index_t<Rank> last_index() const { return seq; }
 
@@ -189,6 +203,8 @@ struct nd::index_t
     bool operator!=(const index_t& other) const { return seq != other.seq; }
     std::size_t& operator[](std::size_t i) { return seq[i]; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
+    decltype(auto) begin() const { return seq.begin(); }
+    decltype(auto) end() const { return seq.end(); }
 
     bool operator< (const index_t<Rank>& other) const { return sq::all_of(sq::zip(seq, other.seq), detail::apply_to(std::less<>())); }
     bool operator> (const index_t<Rank>& other) const { return sq::all_of(sq::zip(seq, other.seq), detail::apply_to(std::greater<>())); }
@@ -225,6 +241,8 @@ struct nd::jumps_t
     bool operator!=(const jumps_t& other) const { return seq != other.seq; }
     std::size_t& operator[](std::size_t i) { return seq[i]; }
     const std::size_t& operator[](std::size_t i) const { return seq[i]; }
+    decltype(auto) begin() const { return seq.begin(); }
+    decltype(auto) end() const { return seq.end(); }
 
     sq::sequence_t<std::size_t, Rank> seq;
 };
@@ -275,6 +293,8 @@ struct nd::access_pattern_t
         access_pattern_t accessor;
         index_t<Rank> current;
     };
+
+    constexpr std::size_t rank() const { return Rank; }
 
 
 
@@ -1061,6 +1081,30 @@ auto nd::divvy(std::size_t num_groups)
 
 
 /**
+ * @brief      Return an index-array of the given shape, mapping the index (i,
+ *             j, ...) to itself.
+ *
+ * @param[in]  shape  The shape
+ *
+ * @tparam     Rank   The rank of the array
+ *
+ * @return     The array
+ */
+template<std::size_t Rank>
+auto nd::index_array(shape_t<Rank> shape)
+{
+    return make_array([] (auto&& index) { return index; }, shape);
+}
+template<typename... Args>
+auto nd::index_array(Args... args)
+{
+    return index_array(make_shape(args...));
+}
+
+
+
+
+/**
  * @brief      Return an array of zeros with the given shape
  *
  * @param[in]  args       shape arguments
@@ -1240,7 +1284,7 @@ auto nd::cartesian_product(ArrayTypes... arrays)
 template<typename... ArrayTypes>
 auto nd::meshgrid(ArrayTypes... arrays)
 {
-    return unzip_array(cartesian_product(arrays...));
+    return unzip(cartesian_product(arrays...));
 }
 
 
