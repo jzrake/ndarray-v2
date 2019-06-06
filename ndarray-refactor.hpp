@@ -41,7 +41,7 @@
 
 
 //=============================================================================
-namespace nd2
+namespace nd
 {
     // support structs
     //=========================================================================    
@@ -89,6 +89,7 @@ namespace nd2
     template<typename ArrayType>                       auto unzip(ArrayType array);
     template<typename... ArrayTypes>                   auto zip(ArrayTypes... arrays);
     template<typename... ArrayTypes>                   auto cartesian_product(ArrayTypes... arrays);
+    template<typename... ArrayTypes>                   auto meshgrid(ArrayTypes... arrays);
     template<std::size_t Rank>                         auto read_index(index_t<Rank> index_to_read);
     template<typename... Args>                         auto read_index(Args... args);
     template<typename ArrayType>                       auto read_indexes(ArrayType array_of_indexes);
@@ -114,7 +115,7 @@ namespace nd2
 
 
 //=============================================================================
-namespace nd2::detail
+namespace nd::detail
 {
     template<typename Fn>
     auto apply_to(Fn fn) { return [fn] (auto t) { return std::apply(fn, t); }; }
@@ -134,7 +135,7 @@ namespace nd2::detail
 
 //=============================================================================
 template<std::size_t Rank>
-struct nd2::shape_t
+struct nd::shape_t
 {
     shape_t() {}
     shape_t(sq::sequence_t<std::size_t, Rank> seq) : seq(seq) {}
@@ -172,7 +173,7 @@ struct nd2::shape_t
 
 //=============================================================================
 template<std::size_t Rank>
-struct nd2::index_t
+struct nd::index_t
 {
     index_t() {}
     index_t(sq::sequence_t<std::size_t, Rank> seq) : seq(seq) {}
@@ -220,7 +221,7 @@ struct nd2::index_t
 
 //=============================================================================
 template<std::size_t Rank>
-struct nd2::jumps_t
+struct nd::jumps_t
 {
     jumps_t() {}
     jumps_t(sq::sequence_t<std::size_t, Rank> seq) : seq(seq) {}
@@ -238,7 +239,7 @@ struct nd2::jumps_t
 
 //=============================================================================
 template<std::size_t Rank>
-struct nd2::memory_strides_t
+struct nd::memory_strides_t
 {
 public:
     memory_strides_t() {}
@@ -260,7 +261,7 @@ public:
 
 //=============================================================================
 template<std::size_t Rank>
-struct nd2::access_pattern_t
+struct nd::access_pattern_t
 {
     //=========================================================================
     struct iterator
@@ -520,7 +521,7 @@ struct nd2::access_pattern_t
 
 //=============================================================================
 template<typename Provider>
-class nd2::array_t
+class nd::array_t
 {
 public:
 
@@ -602,7 +603,7 @@ private:
 
 //=============================================================================
 template<typename ValueType>
-class nd2::buffer_t
+class nd::buffer_t
 {
 public:
 
@@ -704,7 +705,7 @@ private:
 
 //=============================================================================
 template<typename Mapping, std::size_t Rank>
-class nd2::basic_provider_t
+class nd::basic_provider_t
 {
 public:
 
@@ -728,7 +729,7 @@ private:
 
 //=============================================================================
 template<typename ValueType, std::size_t Rank>
-class nd2::shared_provider_t
+class nd::shared_provider_t
 {
 public:
 
@@ -770,7 +771,7 @@ private:
 
 //=============================================================================
 template<typename ValueType, std::size_t Rank>
-class nd2::unique_provider_t
+class nd::unique_provider_t
 {
 public:
 
@@ -813,55 +814,55 @@ private:
 
 //=============================================================================
 template<typename... Args>
-auto nd2::make_shape(Args... args)
+auto nd::make_shape(Args... args)
 {
     return shape_t<sizeof...(Args)>({std::size_t(args)...});
 }
 
 template<typename... Args>
-auto nd2::make_index(Args... args)
+auto nd::make_index(Args... args)
 {
     return index_t<sizeof...(Args)>({std::size_t(args)...});
 }
 
 template<typename... Args>
-auto nd2::make_jumps(Args... args)
+auto nd::make_jumps(Args... args)
 {
     return jumps_t<sizeof...(Args)>({std::size_t(args)...});
 }
 
 template<typename... Args>
-auto nd2::make_access_pattern(Args... args)
+auto nd::make_access_pattern(Args... args)
 {
     return access_pattern_t<sizeof...(Args)>().with_final(args...);
 }
 
 template<std::size_t Rank>
-auto nd2::make_access_pattern(shape_t<Rank> shape)
+auto nd::make_access_pattern(shape_t<Rank> shape)
 {
     return access_pattern_t<Rank>().with_final(shape.last_index());
 }
 
 template<std::size_t Rank>
-auto nd2::uniform_shape(std::size_t value)
+auto nd::uniform_shape(std::size_t value)
 {
-    return nd2::shape_t{sq::uniform_sequence<Rank>(value)};
+    return nd::shape_t{sq::uniform_sequence<Rank>(value)};
 }
 
 template<std::size_t Rank>
-auto nd2::uniform_index(std::size_t value)
+auto nd::uniform_index(std::size_t value)
 {
-    return nd2::index_t{sq::uniform_sequence<Rank>(value)};
+    return nd::index_t{sq::uniform_sequence<Rank>(value)};
 }
 
 template<std::size_t Rank>
-auto nd2::uniform_jumps(std::size_t value)
+auto nd::uniform_jumps(std::size_t value)
 {
-    return nd2::jumps_t{sq::uniform_sequence<Rank>(value)};
+    return nd::jumps_t{sq::uniform_sequence<Rank>(value)};
 }
 
 template<std::size_t Rank>
-auto nd2::make_strides_row_major(const shape_t<Rank>& shape)
+auto nd::make_strides_row_major(const shape_t<Rank>& shape)
 {
     auto result = memory_strides_t<Rank>();
 
@@ -892,7 +893,7 @@ auto nd2::make_strides_row_major(const shape_t<Rank>& shape)
  * @return     The array
  */
 template<typename Provider>
-auto nd2::make_array(Provider&& provider)
+auto nd::make_array(Provider&& provider)
 {
     return array_t<Provider>(std::forward<Provider>(provider));
 }
@@ -913,7 +914,7 @@ auto nd2::make_array(Provider&& provider)
  * @return     The array
  */
 template<typename Mapping, std::size_t Rank>
-auto nd2::make_array(Mapping mapping, shape_t<Rank> shape)
+auto nd::make_array(Mapping mapping, shape_t<Rank> shape)
 {
     return make_array(basic_provider_t<Mapping, Rank>(mapping, shape));
 }
@@ -933,12 +934,12 @@ auto nd2::make_array(Mapping mapping, shape_t<Rank> shape)
  * @return     The array
  */
 template<typename ValueType, std::size_t Rank>
-auto nd2::make_shared_array(shape_t<Rank> shape)
+auto nd::make_shared_array(shape_t<Rank> shape)
 {
     return make_array(shared_provider_t<ValueType, Rank>(shape));
 }
 template<typename ValueType, typename... Args>
-auto nd2::make_shared_array(Args... args)
+auto nd::make_shared_array(Args... args)
 {
     return make_shared_array(make_shape(args...));
 }
@@ -958,12 +959,12 @@ auto nd2::make_shared_array(Args... args)
  * @return     The array
  */
 template<typename ValueType, std::size_t Rank>
-auto nd2::make_unique_array(shape_t<Rank> shape)
+auto nd::make_unique_array(shape_t<Rank> shape)
 {
     return make_array(unique_provider_t<ValueType, Rank>(shape));
 }
 template<typename ValueType, typename... Args>
-auto nd2::make_unique_array(Args... args)
+auto nd::make_unique_array(Args... args)
 {
     return make_unique_array<ValueType>(make_shape(args...));
 }
@@ -978,9 +979,9 @@ auto nd2::make_unique_array(Args... args)
  *
  * @return     The array, not requiring any storage
  */
-auto nd2::range(int count)
+auto nd::range(int count)
 {
-    return make_array([] (auto index) { return index[0]; }, nd2::make_shape(count));
+    return make_array([] (auto index) { return index[0]; }, nd::make_shape(count));
 }
 
 
@@ -995,7 +996,7 @@ auto nd2::range(int count)
  *
  * @return     The array, not requiring any storage
  */
-auto nd2::range(int start, int final, int step)
+auto nd::range(int start, int final, int step)
 {
     if (step == 0 || final / step - start / step < 0)
     {
@@ -1004,7 +1005,7 @@ auto nd2::range(int start, int final, int step)
     return make_array([=] (auto index)
     {
         return start + index[0] * step;
-    }, nd2::make_shape(final / step - start / step));
+    }, nd::make_shape(final / step - start / step));
 }
 
 
@@ -1020,12 +1021,12 @@ auto nd2::range(int start, int final, int step)
  *
  * @return     The array, not requiring any storage
  */
-auto nd2::linspace(double x0, double x1, std::size_t count)
+auto nd::linspace(double x0, double x1, std::size_t count)
 {
     return make_array([=] (auto index)
     {
         return x0 + (x1 - x0) * index[0] / (count - 1);
-    }, nd2::make_shape(count));
+    }, nd::make_shape(count));
 }
 
 
@@ -1043,7 +1044,7 @@ auto nd2::linspace(double x0, double x1, std::size_t count)
  * @return     An array of zeros, not requiring any storage
  */
 template<typename ValueType, typename... Args>
-auto nd2::zeros(Args... args)
+auto nd::zeros(Args... args)
 {
     return make_array([] (auto) { return ValueType(0); }, make_shape(args...));
 }
@@ -1063,7 +1064,7 @@ auto nd2::zeros(Args... args)
  * @return     An array of ones, not requiring any storage
  */
 template<typename ValueType, typename... Args>
-auto nd2::ones(Args... args)
+auto nd::ones(Args... args)
 {
     return make_array([] (auto) { return ValueType(1); }, make_shape(args...));
 }
@@ -1083,7 +1084,7 @@ auto nd2::ones(Args... args)
  * @return     An array with the given shape
  */
 template<typename ArgType, std::size_t Rank>
-auto nd2::promote(ArgType arg, shape_t<Rank> shape)
+auto nd::promote(ArgType arg, shape_t<Rank> shape)
 {
     if constexpr (detail::has_typedef_is_ndarray<ArgType>::value)
     {
@@ -1110,7 +1111,7 @@ auto nd2::promote(ArgType arg, shape_t<Rank> shape)
  * @note       Typical usage might be `for (auto [n, x] : array) { ... }`.
  */
 template<typename ArrayType>
-auto nd2::enumerate(ArrayType array)
+auto nd::enumerate(ArrayType array)
 {
     auto offset_array = make_array([strides = make_strides_row_major(array.shape())] (auto index)
     {
@@ -1132,7 +1133,7 @@ auto nd2::enumerate(ArrayType array)
  * @return     The tuple of arrays
  */
 template<typename ArrayType>
-auto nd2::unzip(ArrayType array)
+auto nd::unzip(ArrayType array)
 {
     auto get_through = [array] (auto i)
     {
@@ -1157,7 +1158,7 @@ auto nd2::unzip(ArrayType array)
  * @return     An array which returns tuples taken from the underlying arrays
  */
 template<typename... ArrayTypes>
-auto nd2::zip(ArrayTypes... arrays)
+auto nd::zip(ArrayTypes... arrays)
 {
     constexpr std::size_t Ranks[] = {ArrayTypes::array_rank...};
     shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
@@ -1188,7 +1189,7 @@ auto nd2::zip(ArrayTypes... arrays)
  *             arrays
  */
 template<typename... ArrayTypes>
-auto nd2::cartesian_product(ArrayTypes... arrays)
+auto nd::cartesian_product(ArrayTypes... arrays)
 {
     auto mapping = [at = std::make_tuple(arrays...)] (auto index)
     {
@@ -1204,6 +1205,24 @@ auto nd2::cartesian_product(ArrayTypes... arrays)
 
 
 /**
+ * @brief      Return a tuple of N-dimensional arrays, given N 1d arrays
+ *
+ * @param[in]  arrays      The arrays
+ *
+ * @tparam     ArrayTypes  The types of the input arrays
+ *
+ * @return     The tuple of arrays
+ */
+template<typename... ArrayTypes>
+auto nd::meshgrid(ArrayTypes... arrays)
+{
+    return unzip_array(cartesian_product(arrays...));
+}
+
+
+
+
+/**
  * @brief      Reads an index from an array.
  *
  * @param[in]  index_to_read  The index to read
@@ -1213,7 +1232,7 @@ auto nd2::cartesian_product(ArrayTypes... arrays)
  * @return     The operator
  */
 template<std::size_t Rank>
-auto nd2::read_index(index_t<Rank> index_to_read)
+auto nd::read_index(index_t<Rank> index_to_read)
 {
     return [index_to_read] (auto&& array)
     {
@@ -1221,7 +1240,7 @@ auto nd2::read_index(index_t<Rank> index_to_read)
     };
 }
 template<typename... Args>
-auto nd2::read_index(Args... args)
+auto nd::read_index(Args... args)
 {
     return read_index(make_index(args...));
 }
@@ -1241,7 +1260,7 @@ auto nd2::read_index(Args... args)
  * @return     The operator
  */
 template<typename ArrayType>
-auto nd2::read_indexes(ArrayType array_of_indexes)
+auto nd::read_indexes(ArrayType array_of_indexes)
 {
     return [array_of_indexes] (auto array_to_index)
     {
@@ -1269,7 +1288,7 @@ auto nd2::read_indexes(ArrayType array_of_indexes)
  * @note       This is the N-dimensional version of the transform operator
  */
 template<typename Function>
-auto nd2::map(Function function)
+auto nd::map(Function function)
 {
     return [function] (auto array)
     {
@@ -1293,11 +1312,11 @@ auto nd2::map(Function function)
  * @return     The operator
  */
 template<typename Function>
-auto nd2::apply(Function fn)
+auto nd::apply(Function fn)
 {
     return [fn] (auto array)
     {
-        return array | nd2::map([fn] (auto args) { return std::apply(fn, args); });
+        return array | nd::map([fn] (auto args) { return std::apply(fn, args); });
     };
 }
 
@@ -1310,7 +1329,7 @@ auto nd2::apply(Function fn)
  *
  * @return     The operator
  */
-auto nd2::to_shared()
+auto nd::to_shared()
 {
     return [] (auto&& array)
     {
@@ -1327,7 +1346,7 @@ auto nd2::to_shared()
  *
  * @return     The operator
  */
-auto nd2::to_unique()
+auto nd::to_unique()
 {
     return [] (auto&& array)
     {
@@ -1344,7 +1363,7 @@ auto nd2::to_unique()
  *
  * @return     The array
  */
-auto nd2::bounds_check()
+auto nd::bounds_check()
 {
     return [] (auto&& array)
     {
@@ -1371,7 +1390,7 @@ auto nd2::bounds_check()
  * @note       The return type is the same as the array value type, except if
  *             it's bool - in which case the return type is unsigned long.
  */
-auto nd2::sum()
+auto nd::sum()
 {
     return [] (auto&& array)
     {
@@ -1398,7 +1417,7 @@ auto nd2::sum()
  *
  * @return     The operator
  */
-auto nd2::all()
+auto nd::all()
 {
     return [] (auto&& array)
     {
@@ -1416,7 +1435,7 @@ auto nd2::all()
  *
  * @return     The operator
  */
-auto nd2::any()
+auto nd::any()
 {
     return [] (auto&& array)
     {
@@ -1434,7 +1453,7 @@ auto nd2::any()
  *
  * @return     The operator
  */
-auto nd2::min()
+auto nd::min()
 {
     return [] (auto&& array) { return min(std::forward<decltype(array)>(array)); };
 }
@@ -1447,7 +1466,7 @@ auto nd2::min()
  *
  * @return     The operator
  */
-auto nd2::max()
+auto nd::max()
 {
     return [] (auto&& array) { return max(std::forward<decltype(array)>(array)); };
 }
@@ -1465,7 +1484,7 @@ auto nd2::max()
  * @return     The minimum value
  */
 template<typename ArrayType>
-auto nd2::min(ArrayType&& array)
+auto nd::min(ArrayType&& array)
 {
     auto result = detail::value_type_of<ArrayType>();
     auto first = true;
@@ -1494,7 +1513,7 @@ auto nd2::min(ArrayType&& array)
  * @return     The maximum value
  */
 template<typename ArrayType>
-auto nd2::max(ArrayType&& array)
+auto nd::max(ArrayType&& array)
 {
     auto result = detail::value_type_of<ArrayType>();
     auto first = true;
@@ -1525,7 +1544,7 @@ auto nd2::max(ArrayType&& array)
  *             is the rank of the argument array
  */
 template<typename ArrayType>
-auto nd2::where(ArrayType array)
+auto nd::where(ArrayType array)
 {
     auto bool_array = array | map([] (auto x) { return bool(x); });
     auto index_list = make_unique_array<index_t<array.rank()>>(bool_array | sum());
@@ -1546,8 +1565,10 @@ auto nd2::where(ArrayType array)
 
 
 //=============================================================================
-namespace nd2
+namespace nd
 {
+    // arithmetic operators
+    //=========================================================================
     template<typename P> auto operator-(const array_t<P>& a) { return a | map(std::negate<>()); }
     template<typename P> auto operator!(const array_t<P>& a) { return a | map(std::logical_not<>()); }
 
@@ -1589,14 +1610,6 @@ namespace nd2
     template<typename T, typename P> auto operator- (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::minus<>()); }
     template<typename T, typename P> auto operator* (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::multiplies<>()); }
     template<typename T, typename P> auto operator/ (const T& a, const array_t<P>& b) { return zip(promote(a, b.shape()), b) | apply(std::divides<>()); }
-}
-
-
-
-
-//=============================================================================
-namespace nd2
-{
 
     // extended operator support structs
     //=========================================================================
@@ -1623,13 +1636,19 @@ namespace nd2
     template<typename... Args>                     auto replace_from(Args... args);
     template<std::size_t Rank>                     auto reshape(shape_t<Rank> shape);
     template<typename... Args>                     auto reshape(Args... args);
+
+    // to_string overloads
+    //=========================================================================
+    template<std::size_t Rank> auto to_string(const index_t<Rank>& index);
+    template<std::size_t Rank> auto to_string(const shape_t<Rank>& index);
+    template<std::size_t Rank> auto to_string(const access_pattern_t<Rank>& region);
 }
 
 
 
 
 //=============================================================================
-class nd2::shifter_t
+class nd::shifter_t
 {
 public:
 
@@ -1673,7 +1692,7 @@ private:
 
 
 //=============================================================================
-class nd2::axis_selector_t
+class nd::axis_selector_t
 {
 public:
 
@@ -1729,7 +1748,7 @@ private:
 
 //=============================================================================
 template<std::size_t Rank>
-class nd2::selector_t
+class nd::selector_t
 {
 public:
 
@@ -1764,7 +1783,7 @@ private:
 
 //=============================================================================
 template<std::size_t Rank, typename ArrayType>
-class nd2::replacer_t
+class nd::replacer_t
 {
 public:
 
@@ -1817,7 +1836,7 @@ private:
 
 //=============================================================================
 template<std::size_t RankDifference>
-class nd2::axis_freezer_t
+class nd::axis_freezer_t
 {
 public:
 
@@ -1865,7 +1884,7 @@ private:
 
 //=============================================================================
 template<typename OperatorType>
-class nd2::axis_reducer_t
+class nd::axis_reducer_t
 {
 public:
 
@@ -1907,7 +1926,7 @@ private:
 
 //=============================================================================
 template<typename ArrayType>
-class nd2::concatenator_t
+class nd::concatenator_t
 {
 public:
 
@@ -1968,7 +1987,7 @@ private:
  * 
  * @example    B = A | shift_by(-2).along_axis(1); // B(i, j) == A(i, j + 2)
  */
-auto nd2::shift_by(int delta)
+auto nd::shift_by(int delta)
 {
     return shifter_t(0, delta);
 }
@@ -1984,7 +2003,7 @@ auto nd2::shift_by(int delta)
  *
  * @return     The operator
  */
-auto nd2::freeze_axis(std::size_t axis_to_freeze)
+auto nd::freeze_axis(std::size_t axis_to_freeze)
 {
     return axis_freezer_t<1>(make_index(axis_to_freeze));
 }
@@ -1999,7 +2018,7 @@ auto nd2::freeze_axis(std::size_t axis_to_freeze)
  *
  * @return     The operator
  */
-auto nd2::select_axis(std::size_t axis_to_select)
+auto nd::select_axis(std::size_t axis_to_select)
 {
     return axis_selector_t(axis_to_select, 0, 0, false);
 }
@@ -2017,13 +2036,13 @@ auto nd2::select_axis(std::size_t axis_to_select)
  * @return     The operator
  */
 template<std::size_t Rank>
-auto nd2::select_from(index_t<Rank> starting_index)
+auto nd::select_from(index_t<Rank> starting_index)
 {
     return selector_t<Rank>().from(starting_index);
 }
 
 template<typename... Args>
-auto nd2::select_from(Args... args)
+auto nd::select_from(Args... args)
 {
     return select_from(make_index(args...));
 }
@@ -2041,7 +2060,7 @@ auto nd2::select_from(Args... args)
  * @return     The operator
  */
 template<std::size_t Rank>
-auto nd2::select(access_pattern_t<Rank> region_to_select)
+auto nd::select(access_pattern_t<Rank> region_to_select)
 {
     return selector_t<Rank>(region_to_select);
 }
@@ -2061,7 +2080,7 @@ auto nd2::select(access_pattern_t<Rank> region_to_select)
  * @return     The operator
  */
 template<typename OperatorType>
-auto nd2::collect(OperatorType reduction)
+auto nd::collect(OperatorType reduction)
 {
     return axis_reducer_t<OperatorType>(0, reduction);
 }
@@ -2083,7 +2102,7 @@ auto nd2::collect(OperatorType reduction)
  *             a logic_error if the array shapes are incompatible.
  */
 template<typename ArrayType>
-auto nd2::concat(ArrayType array_to_concat)
+auto nd::concat(ArrayType array_to_concat)
 {
     return concatenator_t<ArrayType>(0, array_to_concat);
 }
@@ -2105,7 +2124,7 @@ auto nd2::concat(ArrayType array_to_concat)
  *             replacement_array, if those indexes are in the region to replace
  */
 template<std::size_t Rank, typename ArrayType>
-auto nd2::replace(access_pattern_t<Rank> region_to_replace, ArrayType replacement_array)
+auto nd::replace(access_pattern_t<Rank> region_to_replace, ArrayType replacement_array)
 {
     return replacer_t<Rank, ArrayType>(region_to_replace, replacement_array);
 }
@@ -2123,14 +2142,14 @@ auto nd2::replace(access_pattern_t<Rank> region_to_replace, ArrayType replacemen
  * @return     The operator
  */
 template<std::size_t Rank>
-auto nd2::replace_from(index_t<Rank> starting_index)
+auto nd::replace_from(index_t<Rank> starting_index)
 {
     auto dflt = make_array([] (auto) { return 0; }, uniform_shape<Rank>(1));
     return replacer_t<Rank, decltype(dflt)>({}, dflt).from(starting_index);
 }
 
 template<typename... Args>
-auto nd2::replace_from(Args... args)
+auto nd::replace_from(Args... args)
 {
     return replace_from(make_index(args...));
 }
@@ -2149,7 +2168,7 @@ auto nd2::replace_from(Args... args)
  * @return     The operator
  */
 template<std::size_t Rank>
-auto nd2::reshape(shape_t<Rank> new_shape)
+auto nd::reshape(shape_t<Rank> new_shape)
 {
     return [new_shape] (auto&& array)
     {
@@ -2164,7 +2183,41 @@ auto nd2::reshape(shape_t<Rank> new_shape)
 }
 
 template<typename... Args>
-auto nd2::reshape(Args... args)
+auto nd::reshape(Args... args)
 {
     return reshape(make_shape(args...));
+}
+
+
+
+
+//=============================================================================
+template<std::size_t Rank>
+auto nd::to_string(const index_t<Rank>& index)
+{
+    auto result = std::string("[ ");
+
+    for (std::size_t axis = 0; axis < Rank; ++axis)
+    {
+        result += std::to_string(index[axis]) + " ";
+    }
+    return result + "]";
+}
+
+template<std::size_t Rank>
+auto nd::to_string(const shape_t<Rank>& index)
+{
+    auto result = std::string("< ");
+
+    for (std::size_t axis = 0; axis < Rank; ++axis)
+    {
+        result += std::to_string(index[axis]) + " ";
+    }
+    return result + ">";
+}
+
+template<std::size_t Rank>
+auto nd::to_string(const access_pattern_t<Rank>& region)
+{
+    return to_string(region.start) + " -> " + to_string(region.final);
 }

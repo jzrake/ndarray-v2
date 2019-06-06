@@ -105,56 +105,56 @@ TEST_CASE("sequences can have elements removed", "[sequence]")
 //=============================================================================
 TEST_CASE("shapes can be constructed", "[shape]")
 {
-    auto shape1 = nd2::shape_t<3>({10, 10, 10});
-    auto shape2 = nd2::make_shape(10, 10, 10);
+    auto shape1 = nd::shape_t<3>({10, 10, 10});
+    auto shape2 = nd::make_shape(10, 10, 10);
     REQUIRE(shape1 == shape2);
-    REQUIRE(shape1 == nd2::uniform_shape<3>(10));
+    REQUIRE(shape1 == nd::uniform_shape<3>(10));
 }
 
 TEST_CASE("shape methods work correctly", "[shape]")
 {
     SECTION("test 1")
     {
-        auto shape = nd2::make_shape(2, 4, 8, 16);
+        auto shape = nd::make_shape(2, 4, 8, 16);
         REQUIRE(shape.volume() == 2 * 4 * 8 * 16);
-        REQUIRE(shape.contains(nd2::make_index(1, 1, 1, 1)));
-        REQUIRE(shape.last_index() == nd2::make_index(2, 4, 8, 16));
-        REQUIRE(shape.select(1, 2) == nd2::make_shape(4, 8));
-        REQUIRE(shape.remove(1, 2) == nd2::make_shape(2, 16));
-        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(8, 9, 2, 4, 8, 16));
+        REQUIRE(shape.contains(nd::make_index(1, 1, 1, 1)));
+        REQUIRE(shape.last_index() == nd::make_index(2, 4, 8, 16));
+        REQUIRE(shape.select(1, 2) == nd::make_shape(4, 8));
+        REQUIRE(shape.remove(1, 2) == nd::make_shape(2, 16));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd::make_shape(8, 9, 2, 4, 8, 16));
         REQUIRE_FALSE(shape.contains(2, 1, 1, 1));
     }
 
     SECTION("test 2")
     {
-        auto shape = nd2::make_shape(0, 1, 2);
-        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(2));
-        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(1, 2)) == nd2::make_shape(0));
-        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(0, 2)) == nd2::make_shape(1));
-        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd2::make_shape(8, 9, 0, 1, 2));
-        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(1, 2)) == nd2::make_shape(0, 8, 9, 1, 2));
-        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(2, 3)) == nd2::make_shape(0, 1, 8, 9, 2));
-        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(3, 4)) == nd2::make_shape(0, 1, 2, 8, 9));
+        auto shape = nd::make_shape(0, 1, 2);
+        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(0, 1)) == nd::make_shape(2));
+        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(1, 2)) == nd::make_shape(0));
+        REQUIRE(shape.remove(sq::make_sequence<std::size_t>(0, 2)) == nd::make_shape(1));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(0, 1)) == nd::make_shape(8, 9, 0, 1, 2));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(1, 2)) == nd::make_shape(0, 8, 9, 1, 2));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(2, 3)) == nd::make_shape(0, 1, 8, 9, 2));
+        REQUIRE(shape.insert(sq::make_sequence<std::size_t>(8, 9), sq::make_sequence<std::size_t>(3, 4)) == nd::make_shape(0, 1, 2, 8, 9));
     }
 }
 
 TEST_CASE("indexes work correctly", "[index]")
 {
-    auto index = nd2::make_index(2, 3, 4);
+    auto index = nd::make_index(2, 3, 4);
     REQUIRE(index.to_tuple() == std::make_tuple(2, 3, 4));
 }
 
 TEST_CASE("memory strides methods work correctly", "[memory_strides]")
 {
-    auto strides = nd2::make_strides_row_major(nd2::make_shape(3, 4, 5));
+    auto strides = nd::make_strides_row_major(nd::make_shape(3, 4, 5));
 
-    REQUIRE(strides == nd2::memory_strides_t<3>({4 * 5, 5, 1}));
+    REQUIRE(strides == nd::memory_strides_t<3>({4 * 5, 5, 1}));
     REQUIRE(strides.compute_offset(1, 1, 1) == 4 * 5 + 5 + 1);
 }
 
 TEST_CASE("access pattern methods work correctly", "[access_pattern]")
 {
-    auto accessor = nd2::make_access_pattern(10);
+    auto accessor = nd::make_access_pattern(10);
     int n = 0;
 
     for (auto ind : accessor)
@@ -169,7 +169,7 @@ TEST_CASE("access pattern methods work correctly", "[access_pattern]")
 //=============================================================================
 TEST_CASE("arrays can be created with the basic provider", "[array]")
 {
-    auto A = nd2::make_array([] (auto index) { return index[0]; }, nd2::make_shape(10));
+    auto A = nd::make_array([] (auto index) { return index[0]; }, nd::make_shape(10));
     REQUIRE(A(0) == 0);
     REQUIRE(A(9) == 9);
     REQUIRE(A.size() == 10);
@@ -177,8 +177,8 @@ TEST_CASE("arrays can be created with the basic provider", "[array]")
 
 TEST_CASE("ones, zeros array factories work as expected", "[ones] [zeros]")
 {
-    auto A = nd2::ones(10, 20);
-    auto B = nd2::zeros<double>(10, 20);
+    auto A = nd::ones(10, 20);
+    auto B = nd::zeros<double>(10, 20);
     static_assert(std::is_same<decltype(A)::value_type, int>::value);
     static_assert(std::is_same<decltype(B)::value_type, double>::value);
     REQUIRE(A(5, 5) == 1);
@@ -187,67 +187,67 @@ TEST_CASE("ones, zeros array factories work as expected", "[ones] [zeros]")
 
 TEST_CASE("arrays can be created with range", "[array]")
 {
-    REQUIRE(nd2::range(10).size() == 10);
-    REQUIRE(nd2::range(10)(9) == 9);
-    REQUIRE(nd2::range(5, 10, 2).size() == 3);
-    REQUIRE(nd2::range(5, 10, 2)(0) == 5);
-    REQUIRE(nd2::range(5, 10, 2)(1) == 7);
-    REQUIRE(nd2::range(5, 10, 2)(2) == 9);
-    REQUIRE_THROWS(nd2::range(5, 10, 0));
-    REQUIRE_THROWS(nd2::range(5, 10, -1));
-    REQUIRE_NOTHROW(nd2::range(10, 5, -1));
-    REQUIRE(nd2::range(10, 5, -2).size() == 3);
+    REQUIRE(nd::range(10).size() == 10);
+    REQUIRE(nd::range(10)(9) == 9);
+    REQUIRE(nd::range(5, 10, 2).size() == 3);
+    REQUIRE(nd::range(5, 10, 2)(0) == 5);
+    REQUIRE(nd::range(5, 10, 2)(1) == 7);
+    REQUIRE(nd::range(5, 10, 2)(2) == 9);
+    REQUIRE_THROWS(nd::range(5, 10, 0));
+    REQUIRE_THROWS(nd::range(5, 10, -1));
+    REQUIRE_NOTHROW(nd::range(10, 5, -1));
+    REQUIRE(nd::range(10, 5, -2).size() == 3);
 }
 
 TEST_CASE("arrays can be created with linspace", "[array]")
 {
-    REQUIRE(nd2::linspace(0, 1, 10).size() == 10);
-    REQUIRE(nd2::linspace(0, 1, 11)(0) == 0.0);
-    REQUIRE(nd2::linspace(0, 1, 11)(1) == 0.1);
-    REQUIRE(nd2::linspace(0, 1, 11)(10) == 1.0);
+    REQUIRE(nd::linspace(0, 1, 10).size() == 10);
+    REQUIRE(nd::linspace(0, 1, 11)(0) == 0.0);
+    REQUIRE(nd::linspace(0, 1, 11)(1) == 0.1);
+    REQUIRE(nd::linspace(0, 1, 11)(10) == 1.0);
 }
 
 TEST_CASE("array can be zipped together", "[array]")
 {
-    auto a = nd2::range(10);
-    auto b = nd2::linspace(0.0, 1.0, 10);
-    REQUIRE(nd2::zip(a, b)(0) == std::make_tuple(a(0), b(0)));
-    REQUIRE(nd2::zip(a, b)(9) == std::make_tuple(a(9), b(9)));
-    REQUIRE_THROWS(nd2::zip(nd2::range(10), nd2::range(11)));
+    auto a = nd::range(10);
+    auto b = nd::linspace(0.0, 1.0, 10);
+    REQUIRE(nd::zip(a, b)(0) == std::make_tuple(a(0), b(0)));
+    REQUIRE(nd::zip(a, b)(9) == std::make_tuple(a(9), b(9)));
+    REQUIRE_THROWS(nd::zip(nd::range(10), nd::range(11)));
 
-    auto [a1, b1] = nd2::unzip(nd2::zip(a, b));
+    auto [a1, b1] = nd::unzip(nd::zip(a, b));
     REQUIRE(a1(0) == a(0));
     REQUIRE(b1(0) == b(0));
 }
 
 TEST_CASE("array can be created as a cartesian product", "[array]")
 {
-    auto a = nd2::range(10);
-    auto b = nd2::linspace(0.0, 1.0, 20);
-    REQUIRE(nd2::cartesian_product(a, b)(0, 0) == std::make_tuple(0, 0.0));
-    REQUIRE(nd2::cartesian_product(a, b)(1, 0) == std::make_tuple(1, 0.0));
-    REQUIRE(nd2::cartesian_product(a, b)(0, 1) == std::make_tuple(0, b(1)));
+    auto a = nd::range(10);
+    auto b = nd::linspace(0.0, 1.0, 20);
+    REQUIRE(nd::cartesian_product(a, b)(0, 0) == std::make_tuple(0, 0.0));
+    REQUIRE(nd::cartesian_product(a, b)(1, 0) == std::make_tuple(1, 0.0));
+    REQUIRE(nd::cartesian_product(a, b)(0, 1) == std::make_tuple(0, b(1)));
 }
 
 TEST_CASE("arrays can be mapped / applied", "[array]")
 {
-    auto a = nd2::linspace(0.0, 1.0, 20);
-    REQUIRE((a | nd2::map([] (auto x) { return x + 1; }) | nd2::read_index(19)) == 2.0);
-    REQUIRE((nd2::zip(a, a) | nd2::apply(std::plus<>()) | nd2::read_index(19)) == 2.0);
+    auto a = nd::linspace(0.0, 1.0, 20);
+    REQUIRE((a | nd::map([] (auto x) { return x + 1; }) | nd::read_index(19)) == 2.0);
+    REQUIRE((nd::zip(a, a) | nd::apply(std::plus<>()) | nd::read_index(19)) == 2.0);
 }
 
 TEST_CASE("array arithmetic operators work", "[array]")
 {
-    auto a = nd2::linspace(0.0, 1.0, 20);
+    auto a = nd::linspace(0.0, 1.0, 20);
     REQUIRE((a + a)(19) == 2.0);
     REQUIRE((a + 1)(19) == 2.0);
     REQUIRE((1 + a)(19) == 2.0);
-    REQUIRE_THROWS(a + nd2::linspace(0.0, 1.0, 21));
+    REQUIRE_THROWS(a + nd::linspace(0.0, 1.0, 21));
 }
 
 TEST_CASE("arrays can be iterated over", "[array]")
 {
-    auto a = nd2::linspace(0.0, 1.0, 11);
+    auto a = nd::linspace(0.0, 1.0, 11);
     double x = 0.0;
     double y = 0.0;
     int n = 0;
@@ -257,7 +257,7 @@ TEST_CASE("arrays can be iterated over", "[array]")
         REQUIRE(xi == Approx(x));
         x += 0.1;
     }
-    for (auto [ni, yi] : nd2::enumerate(a))
+    for (auto [ni, yi] : nd::enumerate(a))
     {
         REQUIRE(yi == Approx(y));
         REQUIRE(ni == n);
@@ -268,19 +268,19 @@ TEST_CASE("arrays can be iterated over", "[array]")
 
 TEST_CASE("arrays evaluate to memory-backed unique and shared", "[array]")
 {
-    auto A = nd2::range(10);
-    auto B = nd2::range(10) | nd2::to_shared();
+    auto A = nd::range(10);
+    auto B = nd::range(10) | nd::to_shared();
     REQUIRE((A == B)(0));
     REQUIRE((A == B)(9));
 }
 
 TEST_CASE("array reductions work", "[array]")
 {
-    auto A = nd2::range(3);
+    auto A = nd::range(3);
 
-    REQUIRE((A | nd2::sum()) == 3);
-    REQUIRE((A | nd2::min()) == 0);
-    REQUIRE((A | nd2::max()) == 2);
+    REQUIRE((A | nd::sum()) == 3);
+    REQUIRE((A | nd::min()) == 0);
+    REQUIRE((A | nd::max()) == 2);
 }
 
 
@@ -290,27 +290,27 @@ TEST_CASE("array reductions work", "[array]")
 // {
 //     auto n = 0;
 
-//     for (auto a : nd2::range(10) | nd2::transform([] (auto a) { return 2 * a; }))
+//     for (auto a : nd::range(10) | nd::transform([] (auto a) { return 2 * a; }))
 //     {
 //         REQUIRE(a == 2 * n);
 //         ++n;
 //     }
-//     for (auto&& [m, n] : nd2::zip(nd2::range(10), nd2::range(10)))
+//     for (auto&& [m, n] : nd::zip(nd::range(10), nd::range(10)))
 //     {
 //         REQUIRE(m == n);
 //     }
-//     for (auto&& [m, n] : enumerate(nd2::range(10)))
+//     for (auto&& [m, n] : enumerate(nd::range(10)))
 //     {
 //         REQUIRE(m == n);
 //     }
 
-//     REQUIRE(nd2::divvy(10)(nd2::range(10)).size() == 10);
-//     REQUIRE(nd2::divvy(4)(nd2::range(100)).size() == 4);
-//     REQUIRE(nd2::divvy(3)(nd2::range(100)).size() == 3);
+//     REQUIRE(nd::divvy(10)(nd::range(10)).size() == 10);
+//     REQUIRE(nd::divvy(4)(nd::range(100)).size() == 4);
+//     REQUIRE(nd::divvy(3)(nd::range(100)).size() == 3);
 
 //     n = 0;
 
-//     for (auto group : nd2::range(20) | nd2::divvy(3))
+//     for (auto group : nd::range(20) | nd::divvy(3))
 //     {
 //         for (auto item : group)
 //         {
@@ -322,7 +322,7 @@ TEST_CASE("array reductions work", "[array]")
 
 //     n = 0;
 
-//     for (auto group : nd2::range(20) | nd2::divvy(5))
+//     for (auto group : nd::range(20) | nd::divvy(5))
 //     {
 //         for (auto item : group)
 //         {
@@ -334,7 +334,7 @@ TEST_CASE("array reductions work", "[array]")
 
 //     n = 0;
 
-//     for (auto group : nd2::range(20) | nd2::divvy(22))
+//     for (auto group : nd::range(20) | nd::divvy(22))
 //     {
 //         for (auto item : group)
 //         {
@@ -350,14 +350,14 @@ TEST_CASE("buffer works as expected", "[buffer]")
 {
     SECTION("can instantiate an empty buffer")
     {
-        nd2::buffer_t<double> B;
+        nd::buffer_t<double> B;
         REQUIRE(B.size() == 0);
         REQUIRE(B.data() == nullptr);
     }
 
     SECTION("can instantiate a constant buffer")
     {
-        nd2::buffer_t<double> B(100, 1.5);
+        nd::buffer_t<double> B(100, 1.5);
         REQUIRE(B.size() == 100);
         REQUIRE(B.data() != nullptr);
         REQUIRE(B[0] == 1.5);
@@ -367,7 +367,7 @@ TEST_CASE("buffer works as expected", "[buffer]")
     SECTION("can instantiate a buffer from input iterator")
     {
         std::vector<int> A{0, 1, 2, 3};
-        nd2::buffer_t<double> B(A.begin(), A.end());
+        nd::buffer_t<double> B(A.begin(), A.end());
         REQUIRE(B.size() == 4);
         REQUIRE(B[0] == 0);
         REQUIRE(B[1] == 1);
@@ -377,8 +377,8 @@ TEST_CASE("buffer works as expected", "[buffer]")
 
     SECTION("can move-construct and move-assign a buffer")
     {
-        nd2::buffer_t<double> A(100, 1.5);
-        nd2::buffer_t<double> B(200, 2.0);
+        nd::buffer_t<double> A(100, 1.5);
+        nd::buffer_t<double> B(200, 2.0);
 
         B = std::move(A);
 
@@ -403,26 +403,26 @@ TEST_CASE("access patterns work OK", "[access_pattern]")
 {
     SECTION("can be constructed with factory")
     {
-        REQUIRE(nd2::make_access_pattern(10, 10, 10).size() == 1000);
-        REQUIRE(nd2::make_access_pattern(10, 10, 10).with_jumps(2, 2, 2).size() == 125);
+        REQUIRE(nd::make_access_pattern(10, 10, 10).size() == 1000);
+        REQUIRE(nd::make_access_pattern(10, 10, 10).with_jumps(2, 2, 2).size() == 125);
     }
     SECTION("can be iterated over")
     {
-        auto pat = nd2::make_access_pattern(5, 5);
+        auto pat = nd::make_access_pattern(5, 5);
         REQUIRE(pat.contains(0, 0));
         REQUIRE_FALSE(pat.contains(0, 5));
         REQUIRE_FALSE(pat.contains(5, 0));
     }
     SECTION("contains indexes as expected")
     {
-        auto pat = nd2::make_access_pattern(10).with_start(4).with_jumps(2);
+        auto pat = nd::make_access_pattern(10).with_start(4).with_jumps(2);
         REQUIRE(pat.contains(0));
         REQUIRE(pat.contains(2));
         REQUIRE_FALSE(pat.contains(3));
     }
     SECTION("generates indexes as expected")
     {
-        auto pat = nd2::make_access_pattern(10).with_start(4).with_jumps(2);
+        auto pat = nd::make_access_pattern(10).with_start(4).with_jumps(2);
         REQUIRE(pat.generates(4));
         REQUIRE(pat.generates(6));
         REQUIRE(pat.generates(8));
@@ -431,14 +431,14 @@ TEST_CASE("access patterns work OK", "[access_pattern]")
     }
     SECTION("can map and un-map indexes")
     {
-        auto pat = nd2::make_access_pattern(10).with_start(4).with_jumps(2);
-        REQUIRE(pat.inverse_map_index(pat.map_index(nd2::make_index(6))) == nd2::make_index(6));
+        auto pat = nd::make_access_pattern(10).with_start(4).with_jumps(2);
+        REQUIRE(pat.inverse_map_index(pat.map_index(nd::make_index(6))) == nd::make_index(6));
     }
 }
 
 TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider] [unique_provider]")
 {
-    auto provider = nd2::unique_provider_t<double, 3>(nd2::make_shape(20, 10, 5));
+    auto provider = nd::unique_provider_t<double, 3>(nd::make_shape(20, 10, 5));
     auto data = provider.data();
 
     provider(1, 0, 0) = 1;
@@ -451,7 +451,7 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
 
     SECTION("can move the provider into a mutable array and get the same data")
     {
-        auto A = nd2::make_array(std::move(provider));
+        auto A = nd::make_array(std::move(provider));
         A(1, 2, 3) = 123;
         REQUIRE(provider.data() == nullptr);
         REQUIRE(A(1, 0, 0) == 1);
@@ -460,11 +460,11 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
         REQUIRE(A(1, 2, 3) == 123);
         REQUIRE(A.data() == data);
 
-        static_assert(std::is_same<decltype(A)::provider_type, nd2::unique_provider_t<double, 3>>::value);
+        static_assert(std::is_same<decltype(A)::provider_type, nd::unique_provider_t<double, 3>>::value);
     }
     SECTION("can copy a mutable version of the provider into an array and get different data")
     {
-        auto A = nd2::make_array(provider.shared());
+        auto A = nd::make_array(provider.shared());
         REQUIRE(provider.data() != nullptr);
         REQUIRE(A(1, 0, 0) == 1);
         REQUIRE(A(0, 2, 0) == 2);
@@ -473,7 +473,7 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
     }
     SECTION("can move a mutable version of the provider into an array and get the same data")
     {
-        auto A = nd2::make_array(std::move(provider).shared());
+        auto A = nd::make_array(std::move(provider).shared());
         REQUIRE(provider.data() == nullptr);
         REQUIRE(A(1, 0, 0) == 1);
         REQUIRE(A(0, 2, 0) == 2);
@@ -482,11 +482,11 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
     }
     SECTION("can create a transient array from an immutable one")
     {
-        auto A = nd2::make_array(std::move(provider).shared());
+        auto A = nd::make_array(std::move(provider).shared());
         auto a = A;
-        auto B = A | nd2::to_unique();
+        auto B = A | nd::to_unique();
         // auto b = B; // cannot copy-construct B
-        auto C = B | nd2::to_shared(); // cannot assign to C
+        auto C = B | nd::to_shared(); // cannot assign to C
         B(1, 2, 3) = 123;
         REQUIRE(A(1, 2, 3) != 123);
         REQUIRE(B(1, 2, 3) == 123);
@@ -497,8 +497,8 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
 
 TEST_CASE("bounds checking operator works as expected", "[bounds_check]")
 {
-    auto A1 = nd2::ones(10, 10);
-    auto A2 = nd2::ones(10, 10) | nd2::bounds_check();
+    auto A1 = nd::ones(10, 10);
+    auto A2 = nd::ones(10, 10) | nd::bounds_check();
     REQUIRE_NOTHROW(A1(0, 0));
     REQUIRE_NOTHROW(A2(0, 0));
     REQUIRE_NOTHROW(A1(10, 10));
@@ -509,47 +509,47 @@ TEST_CASE("bounds checking operator works as expected", "[bounds_check]")
 // {
 //     SECTION("unique")
 //     {
-//         auto provider = nd2::make_unique_provider<double>(10, 10);
-//         REQUIRE_NOTHROW(provider.reshape(nd2::make_shape(10, 10)));
-//         REQUIRE_NOTHROW(provider.reshape(nd2::make_shape(5, 20)));
-//         REQUIRE_NOTHROW(provider.reshape(nd2::make_shape(5, 5, 4)));
-//         REQUIRE_THROWS(provider.reshape(nd2::make_shape(10, 10, 10)));
+//         auto provider = nd::make_unique_provider<double>(10, 10);
+//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(10, 10)));
+//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 20)));
+//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 5, 4)));
+//         REQUIRE_THROWS(provider.reshape(nd::make_shape(10, 10, 10)));
 //     }
 //     SECTION("shared")
 //     {
-//         auto provider = nd2::make_shared_provider<double>(10, 10);
-//         REQUIRE_NOTHROW(provider.reshape(nd2::make_shape(10, 10)));
-//         REQUIRE_NOTHROW(provider.reshape(nd2::make_shape(5, 20)));
-//         REQUIRE_NOTHROW(provider.reshape(nd2::make_shape(5, 5, 4)));
-//         REQUIRE_THROWS(provider.reshape(nd2::make_shape(10, 10, 10)));
-//         REQUIRE(provider.reshape(nd2::make_shape(5, 5, 4)).data() == provider.data());
+//         auto provider = nd::make_shared_provider<double>(10, 10);
+//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(10, 10)));
+//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 20)));
+//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 5, 4)));
+//         REQUIRE_THROWS(provider.reshape(nd::make_shape(10, 10, 10)));
+//         REQUIRE(provider.reshape(nd::make_shape(5, 5, 4)).data() == provider.data());
 //     }
 // }
 
 // TEST_CASE("arrays can be reshaped given a reshapable provider", "[unique_provider] [reshape]")
 // {
-//     auto A = nd2::make_array(nd2::make_unique_provider<double>(10, 10));
-//     REQUIRE_NOTHROW(A | nd2::reshape(2, 50));
-//     REQUIRE_THROWS(A | nd2::reshape(2, 51));
+//     auto A = nd::make_array(nd::make_unique_provider<double>(10, 10));
+//     REQUIRE_NOTHROW(A | nd::reshape(2, 50));
+//     REQUIRE_THROWS(A | nd::reshape(2, 51));
 // }
 
 TEST_CASE("replace operator works as expected", "[replace]")
 {
     SECTION("trying to replace a region with an array of the wrong size throws")
     {
-        auto A1 = nd2::ones(10);
-        auto A2 = nd2::ones(5);
-        auto patch1 = nd2::make_access_pattern(10).with_start(5);
-        auto patch2 = nd2::make_access_pattern(10).with_start(6);
-        REQUIRE_NOTHROW(nd2::replace(patch1, A2));
-        REQUIRE_THROWS(A1 | nd2::replace(patch2, A2));
+        auto A1 = nd::ones(10);
+        auto A2 = nd::ones(5);
+        auto patch1 = nd::make_access_pattern(10).with_start(5);
+        auto patch2 = nd::make_access_pattern(10).with_start(6);
+        REQUIRE_NOTHROW(nd::replace(patch1, A2));
+        REQUIRE_THROWS(A1 | nd::replace(patch2, A2));
     }
     SECTION("replacing all of an array works")
     {
-        auto patch = nd2::make_access_pattern(10);
-        auto A1 = nd2::ones<double>(10);
-        auto A2 = nd2::ones<double>(10) * 2.0;
-        auto A3 = A1 | nd2::replace(patch, A2);
+        auto patch = nd::make_access_pattern(10);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(10) * 2.0;
+        auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
         {
@@ -558,10 +558,10 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing the first half of an array with constant values works")
     {
-        auto patch = nd2::make_access_pattern(5);
-        auto A1 = nd2::ones<double>(10);
-        auto A2 = nd2::ones<double>(5) * 2.0;
-        auto A3 = A1 | nd2::replace(patch, A2);
+        auto patch = nd::make_access_pattern(5);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(5) * 2.0;
+        auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
         {
@@ -570,10 +570,10 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing the second half of an array with constant values works")
     {
-        auto patch = nd2::make_access_pattern(10).with_start(5);
-        auto A1 = nd2::ones<double>(10);
-        auto A2 = nd2::ones<double>(5) * 2.0;
-        auto A3 = A1 | nd2::replace(patch, A2);
+        auto patch = nd::make_access_pattern(10).with_start(5);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(5) * 2.0;
+        auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
         {
@@ -582,10 +582,10 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing the second half of an array with linear values works")
     {
-        auto patch = nd2::make_access_pattern(10).with_start(5);
-        auto A1 = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(10));
-        auto A2 = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(5));
-        auto A3 = A1 | nd2::replace(patch, A2);
+        auto patch = nd::make_access_pattern(10).with_start(5);
+        auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
+        auto A2 = nd::make_array([] (auto i) { return i; }, nd::make_shape(5));
+        auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
         {
@@ -594,10 +594,10 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing every other value works")
     {
-        auto patch = nd2::make_access_pattern(10).with_start(0).with_jumps(2);
-        auto A1 = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(10));
-        auto A2 = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(5));
-        auto A3 = A1 | nd2::replace(patch, A2);
+        auto patch = nd::make_access_pattern(10).with_start(0).with_jumps(2);
+        auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
+        auto A2 = nd::make_array([] (auto i) { return i; }, nd::make_shape(5));
+        auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
         {
@@ -606,9 +606,9 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replace_from operator works", "[replace_from]")
     {
-        auto A = nd2::zeros(10, 10);
-        REQUIRE_NOTHROW(A | nd2::replace_from(0, 0).to(10, 5).with(nd2::ones(10, 5)));
-        REQUIRE_THROWS(A | nd2::replace_from(0, 0).to(10, 5).with(nd2::ones(10, 6)));
+        auto A = nd::zeros(10, 10);
+        REQUIRE_NOTHROW(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 5)));
+        REQUIRE_THROWS(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 6)));
     }
 }
 
@@ -616,55 +616,55 @@ TEST_CASE("select operator works as expected", "[select]")
 {
     SECTION("with index array")
     {
-        auto A1 = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(10));
-        auto A2 = A1 | nd2::select(nd2::make_access_pattern(5));
-        auto A3 = A1 | nd2::select(nd2::make_access_pattern(10).with_start(5));
-        REQUIRE(A2.shape() == nd2::make_shape(5));
-        REQUIRE(A3.shape() == nd2::make_shape(5));
-        REQUIRE(A2(0) == nd2::make_index(0));
-        REQUIRE(A3(0) == nd2::make_index(5));
-        REQUIRE_NOTHROW(A1 | nd2::select(nd2::make_access_pattern(10)));
-        REQUIRE_THROWS(A1 | nd2::select(nd2::make_access_pattern(11)));
+        auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
+        auto A2 = A1 | nd::select(nd::make_access_pattern(5));
+        auto A3 = A1 | nd::select(nd::make_access_pattern(10).with_start(5));
+        REQUIRE(A2.shape() == nd::make_shape(5));
+        REQUIRE(A3.shape() == nd::make_shape(5));
+        REQUIRE(A2(0) == nd::make_index(0));
+        REQUIRE(A3(0) == nd::make_index(5));
+        REQUIRE_NOTHROW(A1 | nd::select(nd::make_access_pattern(10)));
+        REQUIRE_THROWS(A1 | nd::select(nd::make_access_pattern(11)));
     }
     SECTION("with shared array")
     {
-        auto A1 = nd2::make_unique_array<double>(10, 10);
-        auto A2 = A1 | nd2::to_shared() | nd2::select(nd2::make_access_pattern(5, 5));
+        auto A1 = nd::make_unique_array<double>(10, 10);
+        auto A2 = A1 | nd::to_shared() | nd::select(nd::make_access_pattern(5, 5));
         A1(0, 0) = 1.0;
         REQUIRE(A1(0, 0) == 1.0);
         REQUIRE(A2(0, 0) == 0.0);
-        REQUIRE(A2.shape() == nd2::make_shape(5, 5));
+        REQUIRE(A2.shape() == nd::make_shape(5, 5));
     }
 }
 
 TEST_CASE("select_axis operator works as expected", "[select_axis]")
 {
-    auto A = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(10, 10));
+    auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(10, 10));
 
-    REQUIRE((A | nd2::select_axis(0).from(2).to(8)).shape() == nd2::make_shape(6, 10));
-    REQUIRE((A | nd2::select_axis(1).from(2).to(8)).shape() == nd2::make_shape(10, 6));
-    REQUIRE((A | nd2::select_axis(0).from(2).to(2).from_the_end()).shape() == nd2::make_shape(6, 10));
-    REQUIRE((A | nd2::select_axis(1).from(2).to(2).from_the_end()).shape() == nd2::make_shape(10, 6));
+    REQUIRE((A | nd::select_axis(0).from(2).to(8)).shape() == nd::make_shape(6, 10));
+    REQUIRE((A | nd::select_axis(1).from(2).to(8)).shape() == nd::make_shape(10, 6));
+    REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end()).shape() == nd::make_shape(6, 10));
+    REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end()).shape() == nd::make_shape(10, 6));
 
-    REQUIRE((A | nd2::select_axis(0).from(2).to(2).from_the_end() | nd2::read_index(0, 0)) == nd2::make_index(2, 0));
-    REQUIRE((A | nd2::select_axis(1).from(2).to(2).from_the_end() | nd2::read_index(0, 0)) == nd2::make_index(0, 2));
+    REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(2, 0));
+    REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(0, 2));
 }
 
 TEST_CASE("freeze_axis operator works as expected", "[freeze_axis]")
 {
-    auto A = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(10, 10));
-    REQUIRE((A | nd2::freeze_axis(0).at_index(5)).shape() == nd2::make_shape(10));
-    REQUIRE((A | nd2::freeze_axis(0).at_index(5))(0) == nd2::make_index(5, 0));
-    REQUIRE((A | nd2::freeze_axis(0).at_index(5))(5) == nd2::make_index(5, 5));
-    REQUIRE((A | nd2::freeze_axis(1).at_index(5))(0) == nd2::make_index(0, 5));
-    REQUIRE((A | nd2::freeze_axis(1).at_index(5))(5) == nd2::make_index(5, 5));
+    auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(10, 10));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5)).shape() == nd::make_shape(10));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5))(0) == nd::make_index(5, 0));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5))(5) == nd::make_index(5, 5));
+    REQUIRE((A | nd::freeze_axis(1).at_index(5))(0) == nd::make_index(0, 5));
+    REQUIRE((A | nd::freeze_axis(1).at_index(5))(5) == nd::make_index(5, 5));
 }
 
 TEST_CASE("binary operation works as expected")
 {
-    auto A = nd2::ones(10, 10);
-    auto B = nd2::ones<double>(10, 10);
-    auto b = nd2::ones<double>(10, 11);
+    auto A = nd::ones(10, 10);
+    auto B = nd::ones<double>(10, 10);
+    auto b = nd::ones<double>(10, 11);
     auto C = A + B;
     auto D = -C;
     static_assert(std::is_same<decltype(C(0, 0)), double>::value);
@@ -683,66 +683,66 @@ TEST_CASE("binary operation works as expected")
 
 TEST_CASE("can read an index from an array", "[read_index]")
 {
-    REQUIRE((nd2::ones(10, 20, 40) | nd2::read_index(2, 3, 4)) == 1);
+    REQUIRE((nd::ones(10, 20, 40) | nd::read_index(2, 3, 4)) == 1);
 }
 
 TEST_CASE("can sum an array", "[sum]")
 {
-    using namespace nd2;
-    auto A = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(3));
+    using namespace nd;
+    auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(3));
     REQUIRE((A | map([] (auto i) { return i[0]; }) | sum()) == 3);
     REQUIRE((ones(10, 10) | sum()) == 100);
 }
 
 TEST_CASE("can test for equality", "[sum] [any] [all]")
 {
-    REQUIRE(((nd2::ones(10, 10) == nd2::ones(10, 10)) | nd2::sum()) == 100);
-    REQUIRE(bool((nd2::ones(10, 10) == nd2::ones(10, 10)) | nd2::all()));
-    REQUIRE(bool((nd2::ones(10, 10) == nd2::ones<double>(10, 10)) | nd2::all()));
-    REQUIRE(bool((nd2::ones(10, 10) != nd2::zeros<double>(10, 10)) | nd2::all()));
-    REQUIRE_FALSE(bool((nd2::ones(10, 10) == nd2::zeros<double>(10, 10)) | nd2::any()));
+    REQUIRE(((nd::ones(10, 10) == nd::ones(10, 10)) | nd::sum()) == 100);
+    REQUIRE(bool((nd::ones(10, 10) == nd::ones(10, 10)) | nd::all()));
+    REQUIRE(bool((nd::ones(10, 10) == nd::ones<double>(10, 10)) | nd::all()));
+    REQUIRE(bool((nd::ones(10, 10) != nd::zeros<double>(10, 10)) | nd::all()));
+    REQUIRE_FALSE(bool((nd::ones(10, 10) == nd::zeros<double>(10, 10)) | nd::any()));
 }
 
 TEST_CASE("can get an index array using where, and pass that to read_indexes", "[where] [read_indexes]")
 {
-    auto a = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(10));
-    auto A = a | nd2::map([] (auto i) { return i[0]; });
-    REQUIRE(nd2::where(A < 5).size() == 5);
-    REQUIRE(bool(((A | nd2::read_indexes(nd2::where(A < 5))) < 5) | nd2::all()));
+    auto a = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
+    auto A = a | nd::map([] (auto i) { return i[0]; });
+    REQUIRE(nd::where(A < 5).size() == 5);
+    REQUIRE(bool(((A | nd::read_indexes(nd::where(A < 5))) < 5) | nd::all()));
 }
 
 TEST_CASE("can get the sum of a 3D array on each axis", "[collect]")
 {
-    auto A = nd2::ones(10, 20, 30);
-    REQUIRE((A | nd2::collect(nd2::sum()).along_axis(0) | nd2::read_index(0, 0)) == 10);
-    REQUIRE((A | nd2::collect(nd2::sum()).along_axis(1) | nd2::read_index(0, 0)) == 20);
-    REQUIRE((A | nd2::collect(nd2::sum()).along_axis(2) | nd2::read_index(0, 0)) == 30);
+    auto A = nd::ones(10, 20, 30);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(0) | nd::read_index(0, 0)) == 10);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(1) | nd::read_index(0, 0)) == 20);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(2) | nd::read_index(0, 0)) == 30);
 }
 
-// TEST_CASE("can concat two 3d arrays on compatible axes", "[collect]")
-// {
-//     using namespace nd;
-//     REQUIRE((ones(10, 10, 20) | concat(zeros(10, 10, 30)).on_axis(2) | read_index(0, 0, 19)) == 1);
-//     REQUIRE((ones(10, 10, 20) | concat(zeros(10, 10, 30)).on_axis(2) | read_index(0, 0, 20)) == 0);
-//     REQUIRE_THROWS(ones(10, 10, 20) | concat(zeros(10, 11, 30)).on_axis(2));
-// }
+TEST_CASE("can concat two 3d arrays on compatible axes", "[collect]")
+{
+    using namespace nd;
+    REQUIRE((ones(10, 10, 20) | concat(zeros(10, 10, 30)).on_axis(2) | read_index(0, 0, 19)) == 1);
+    REQUIRE((ones(10, 10, 20) | concat(zeros(10, 10, 30)).on_axis(2) | read_index(0, 0, 20)) == 0);
+    REQUIRE_THROWS(ones(10, 10, 20) | concat(zeros(10, 11, 30)).on_axis(2));
+}
 
-// TEST_CASE("can create the cartesian product of arrays", "[cartesian_product]")
-// {
-//     auto A = nd2::cartesian_product(nd2::ones(10), nd2::zeros(20));
-//     REQUIRE(A.shape() == nd2::make_shape(10, 20));
-//     REQUIRE(A(0, 0) == std::make_tuple(1, 0));
-// }
+TEST_CASE("can create the cartesian product of arrays", "[cartesian_product]")
+{
+    auto A = nd::cartesian_product(nd::ones(10), nd::zeros(20));
+    REQUIRE(A.shape() == nd::make_shape(10, 20));
+    REQUIRE(A(0, 0) == std::make_tuple(1, 0));
+}
 
 TEST_CASE("can shift an array", "[shift]")
 {
-    auto A = nd2::make_array([] (auto i) { return i; }, nd2::make_shape(10, 10));
-    REQUIRE((A | nd2::shift_by(2).along_axis(0)).shape() == nd2::make_shape(8, 10));
-    REQUIRE((A | nd2::shift_by(2).along_axis(1)).shape() == nd2::make_shape(10, 8));
-    REQUIRE((A | nd2::shift_by(-2).along_axis(0)).shape() == nd2::make_shape(8, 10));
-    REQUIRE((A | nd2::shift_by(-2).along_axis(1)).shape() == nd2::make_shape(10, 8));
-    REQUIRE((A | nd2::shift_by(-2).along_axis(0) | nd2::read_index(0, 0)) == nd2::make_index(2, 0));
-    REQUIRE((A | nd2::shift_by(-2).along_axis(1) | nd2::read_index(0, 0)) == nd2::make_index(0, 2));
-    REQUIRE((A | nd2::shift_by(+2).along_axis(0) | nd2::read_index(2, 0)) == nd2::make_index(0, 0));
-    REQUIRE((A | nd2::shift_by(+2).along_axis(1) | nd2::read_index(0, 2)) == nd2::make_index(0, 0));
+    auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(10, 10));
+    REQUIRE((A | nd::shift_by(2).along_axis(0)).shape() == nd::make_shape(8, 10));
+    REQUIRE((A | nd::shift_by(2).along_axis(1)).shape() == nd::make_shape(10, 8));
+    REQUIRE((A | nd::shift_by(-2).along_axis(0)).shape() == nd::make_shape(8, 10));
+    REQUIRE((A | nd::shift_by(-2).along_axis(1)).shape() == nd::make_shape(10, 8));
+    REQUIRE((A | nd::shift_by(-2).along_axis(0) | nd::read_index(0, 0)) == nd::make_index(2, 0));
+    REQUIRE((A | nd::shift_by(-2).along_axis(1) | nd::read_index(0, 0)) == nd::make_index(0, 2));
+    REQUIRE((A | nd::shift_by(+2).along_axis(0) | nd::read_index(2, 0)) == nd::make_index(0, 0));
+    REQUIRE((A | nd::shift_by(+2).along_axis(1) | nd::read_index(0, 2)) == nd::make_index(0, 0));
 }
