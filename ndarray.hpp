@@ -132,13 +132,13 @@ namespace nd
 
     // extended operator support structs
     //=========================================================================
-    /**/                                           class axis_shifter_t;
     /**/                                           class axis_selector_t;
+    /**/                                           class axis_shifter_t;
     template<std::size_t RankDifference>           class axis_freezer_t;
     template<typename ArrayType>                   class axis_reducer_t;
+    template<typename ArrayType>                   class concatenator_t;
     template<std::size_t Rank, typename ArrayType> class replacer_t;
     template<std::size_t Rank>                     class selector_t;
-    template<typename ArrayType>                   class concatenator_t;
 
 
     // extended operators
@@ -173,23 +173,6 @@ namespace nd
     template<typename ValueType, std::size_t Rank> using shared_array = array_t<shared_provider_t<ValueType, Rank>>;
     template<typename ValueType, std::size_t Rank> using unique_array = array_t<unique_provider_t<ValueType, Rank>>;
     template<typename ArrayType> using value_type_of = typename std::remove_reference_t<ArrayType>::value_type;
-
-
-    // algorithm support structs
-    //=========================================================================
-    template<typename ValueType>                          class range_container_t;
-    template<typename ValueType, typename ContainerTuple> class zipped_container_t;
-
-
-    // std::algorithm wrappers for ranges, and some extras
-    //=========================================================================
-    template<typename Range, typename Seed, typename Function> auto accumulate(Range&& rng, Seed&& seed, Function&& fn);
-    template<typename Range, typename Predicate>               auto all_of(Range&& rng, Predicate&& pred);
-    template<typename Range, typename Predicate>               auto any_of(Range&& rng, Predicate&& pred);
-    template<typename Range>                                   auto distance(Range&& rng);
-    template<typename Range>                                   auto enumerate(Range&& rng);
-    template<typename ValueType>                               auto range(ValueType count);
-    template<typename... ContainerTypes>                       auto zip(ContainerTypes&&... containers);
 
 
     // helper functions
@@ -234,151 +217,6 @@ namespace nd
 
 
 //=============================================================================
-template<typename ValueType>
-class nd::range_container_t
-{
-public:
-
-    using value_type = ValueType;
-
-    //=========================================================================
-    struct iterator
-    {
-        using iterator_category = std::input_iterator_tag;
-        using value_type = ValueType;
-        using difference_type = std::ptrdiff_t;
-        using pointer = value_type*;
-        using reference = value_type&;
-
-        iterator& operator++() { ++current; return *this; }
-        iterator operator+(std::size_t difference) const { return { ValueType(current + difference), start, final }; }
-        bool operator==(const iterator& other) const { return current == other.current; }
-        bool operator!=(const iterator& other) const { return current != other.current; }
-        const ValueType& operator*() const { return current; }
-        ValueType current = 0;
-        ValueType start = 0;
-        ValueType final = 0;
-    };
-
-    //=========================================================================
-    range_container_t(ValueType start, ValueType final) : start(start), final(final) {}
-    std::size_t size() const { return final - start; }
-    iterator begin() const { return { 0, start, final }; }
-    iterator end() const { return { final, start, final }; }
-    template<typename Function> auto operator|(Function&& fn) const { return fn(*this); }
-
-private:
-    //=========================================================================
-    ValueType start = 0;
-    ValueType final = 0;
-};
-
-
-
-
-//=============================================================================
-template<typename ValueType, typename ContainerTuple>
-class nd::zipped_container_t
-{
-public:
-
-    using value_type = ValueType;
-
-    //=========================================================================
-    template<typename IteratorTuple>
-    struct iterator
-    {
-        using iterator_category = std::input_iterator_tag;
-        using value_type = zipped_container_t::value_type;
-        using difference_type = std::ptrdiff_t;
-        using pointer = value_type*;
-        using reference = value_type&;
-
-        iterator& operator++()
-        {
-            iterators = detail::transform_tuple([] (auto x) { return ++x; }, iterators);
-            return *this;
-        }
-        bool operator==(const iterator& other) const { return iterators == other.iterators; }
-        bool operator!=(const iterator& other) const { return iterators != other.iterators; }
-        decltype(auto) operator*() const { return detail::transform_tuple([] (const auto& x) { return *x; }, iterators); }
-
-        IteratorTuple iterators;
-    };
-
-    //=========================================================================
-    zipped_container_t(ContainerTuple&& containers) : containers(containers) {}
-
-    auto begin() const
-    {
-        auto res = detail::transform_tuple([] (const auto& x) { return std::begin(x); }, containers);
-        return iterator<decltype(res)>{res};
-    }
-
-    auto end() const
-    {
-        auto res = detail::transform_tuple([] (const auto& x) { return std::end(x); }, containers);
-        return iterator<decltype(res)>{res};
-    }
-    template<typename Function> auto operator|(Function&& fn) const { return fn(*this); }
-
-private:
-    //=========================================================================
-    ContainerTuple containers;
-};
-
-
-
-
-//=============================================================================
-template<typename Range, typename Seed, typename Function>
-auto nd::accumulate(Range&& rng, Seed&& seed, Function&& fn)
-{
-    return std::accumulate(rng.begin(), rng.end(), std::forward<Seed>(seed), std::forward<Function>(fn));
-}
-
-template<typename Range, typename Predicate>
-auto nd::all_of(Range&& rng, Predicate&& pred)
-{
-    return std::all_of(rng.begin(), rng.end(), pred);
-}
-
-template<typename Range, typename Predicate>
-auto nd::any_of(Range&& rng, Predicate&& pred)
-{
-    return std::any_of(rng.begin(), rng.end(), pred);
-}
-
-template<typename Range>
-auto nd::distance(Range&& rng)
-{
-    return std::distance(rng.begin(), rng.end());
-}
-
-template<typename Range>
-auto nd::enumerate(Range&& rng)
-{
-    return zip(range(distance(std::forward<Range>(rng))), std::forward<Range>(rng));
-}
-
-template<typename ValueType>
-auto nd::range(ValueType count)
-{
-    return nd::range_container_t<ValueType>(0, count);
-}
-
-template<typename... ContainerTypes>
-auto nd::zip(ContainerTypes&&... containers)
-{
-    using ValueType = std::tuple<typename std::remove_reference_t<ContainerTypes>::value_type...>;
-    using ContainerTuple = std::tuple<ContainerTypes...>;
-    return nd::zipped_container_t<ValueType, ContainerTuple>(std::forward_as_tuple(containers...));
-}
-
-
-
-
-//=============================================================================
 template<std::size_t Rank, typename ValueType, typename DerivedType>
 class nd::short_sequence_t
 {
@@ -391,51 +229,46 @@ public:
     {
         DerivedType result;
 
-        for (auto n : range(Rank))
-        {
+        for (std::size_t n = 0; n < Rank; ++n)
             result.memory[n] = arg;
-        }
+
         return result;
     }
 
     template<typename Range>
     static DerivedType from_range(Range&& rng)
     {
-        if (distance(rng) != Rank)
-        {
-            throw std::logic_error("sequence constructed from range of wrong size");
-        }
-        DerivedType result;
+        if (rng.size() != Rank)
+            throw std::logic_error("sequence constructed from initializer list of wrong size");
 
-        for (const auto& [n, a] : enumerate(rng))
-        {
-            result.memory[n] = a;
-        }
+        DerivedType result;
+        std::size_t n = 0;
+
+        for (auto a : rng)
+            result[n++] = a;
+
         return result;
     }
 
     short_sequence_t()
     {
-        for (auto n : range(Rank))
-        {
+        for (std::size_t n = 0; n < Rank; ++n)
             memory[n] = ValueType();
-        }
     }
 
     short_sequence_t(std::initializer_list<ValueType> args)
     {
         if (args.size() != Rank)
-        {
             throw std::logic_error("sequence constructed from initializer list of wrong size");
-        }
-        for (const auto& [n, a] : enumerate(args))
-        {
-            memory[n] = a;
-        }
+
+        std::size_t n = 0;
+
+        for (auto a : args)
+            memory[n++] = a;
     }
 
-    bool operator==(const DerivedType& other) const { return all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) == std::get<1>(t); }); }
-    bool operator!=(const DerivedType& other) const { return any_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) != std::get<1>(t); }); }
+    bool operator==(const DerivedType& b) const { for (std::size_t i = 0; i < Rank; ++i) { if (memory[i] != b[i]) return false; } return true; }
+    bool operator!=(const DerivedType& b) const { for (std::size_t i = 0; i < Rank; ++i) { if (memory[i] != b[i]) return true; } return false; }
     constexpr std::size_t size() const { return Rank; }
     const ValueType* data() const { return memory; }
     const ValueType* begin() const { return memory; }
@@ -451,10 +284,9 @@ public:
     {
         DerivedType result;
 
-        for (auto n : range(Rank))
-        {
-            result[n] = fn(memory[n]);
-        }
+        for (std::size_t i = 0; i < Rank; ++i)
+            result[i] = fn(memory[i]);
+
         return result;
     }
 
@@ -482,11 +314,17 @@ class nd::shape_t : public nd::short_sequence_t<Rank, std::size_t, shape_t<Rank>
 public:
     using short_sequence_t<Rank, std::size_t, shape_t<Rank>>::short_sequence_t;
 
-    std::size_t volume() const { return accumulate(*this, 1, std::multiplies<>()); }
+    std::size_t volume() const
+    {
+        return std::accumulate(this->begin(), this->end(), 1, std::multiplies<>());
+    }
 
     bool contains(const index_t<Rank>& index) const
     {
-        return all_of(zip(index, *this), [] (const auto& t) { return std::get<0>(t) < std::get<1>(t); });
+        for (std::size_t i = 0; i < Rank; ++i)
+            if (this->operator[](i) <= index[i])
+                return false;
+        return true;
     }
 
     template<typename... Args>
@@ -545,10 +383,10 @@ public:
     auto as_tuple(std::index_sequence<Is...>) const { return std::make_tuple(this->operator[](Is)...); }
     auto as_tuple() const { return as_tuple(std::make_index_sequence<Rank>()); }
 
-    bool operator< (const index_t<Rank>& other) const { return all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) <  std::get<1>(t); }); }
-    bool operator> (const index_t<Rank>& other) const { return all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) >  std::get<1>(t); }); }
-    bool operator<=(const index_t<Rank>& other) const { return all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) <= std::get<1>(t); }); }
-    bool operator>=(const index_t<Rank>& other) const { return all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) >= std::get<1>(t); }); }
+    bool operator< (const index_t<Rank>& b) const { for (std::size_t i = 0; i < Rank; ++i) { if (! (this->operator[](i) <  b[i])) return false; } return true; }
+    bool operator> (const index_t<Rank>& b) const { for (std::size_t i = 0; i < Rank; ++i) { if (! (this->operator[](i) >  b[i])) return false; } return true; }
+    bool operator<=(const index_t<Rank>& b) const { for (std::size_t i = 0; i < Rank; ++i) { if (! (this->operator[](i) <= b[i])) return false; } return true; }
+    bool operator>=(const index_t<Rank>& b) const { for (std::size_t i = 0; i < Rank; ++i) { if (! (this->operator[](i) >= b[i])) return false; } return true; }
 };
 
 
@@ -966,50 +804,6 @@ auto nd::partition_shape(shape_t<Rank> shape)
 
 
 //=============================================================================
-class nd::axis_shifter_t
-{
-public:
-
-    //=========================================================================
-    axis_shifter_t(std::size_t axis_to_shift, int delta) : axis_to_shift(axis_to_shift), delta(delta) {}
-
-    template<typename ArrayType>
-    auto operator()(ArrayType&& array) const
-    {
-        if (axis_to_shift >= array.rank())
-        {
-            throw std::logic_error("cannot shift axis greater than or equal to array rank");
-        }
-        if (std::size_t(std::abs(delta)) >= array.shape(axis_to_shift))
-        {
-            throw std::logic_error("cannot shift an array by more than its length on that axis");
-        }
-        auto mapping = [axis_to_shift=axis_to_shift, delta=delta, array] (auto index)
-        {
-            index[axis_to_shift] -= delta;
-            return array(index);
-        };
-        auto shape = array.shape();
-        shape[axis_to_shift] -= std::abs(delta);
-
-        return make_array(mapping, shape);
-    }
-
-    auto along_axis(std::size_t new_axis_to_shift) const
-    {
-        return axis_shifter_t(new_axis_to_shift, delta);
-    }
-
-private:
-    //=========================================================================
-    std::size_t axis_to_shift;
-    int delta;
-};
-
-
-
-
-//=============================================================================
 class nd::axis_selector_t
 {
 public:
@@ -1065,35 +859,204 @@ private:
 
 
 //=============================================================================
-template<std::size_t Rank>
-class nd::selector_t
+class nd::axis_shifter_t
 {
 public:
 
     //=========================================================================
-    selector_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
+    axis_shifter_t(std::size_t axis_to_shift, int delta) : axis_to_shift(axis_to_shift), delta(delta) {}
 
     template<typename ArrayType>
     auto operator()(ArrayType&& array) const
     {
-        if (! region.within(array.shape()))
+        if (axis_to_shift >= array.rank())
         {
-            throw std::logic_error("out-of-bounds selection");
+            throw std::logic_error("cannot shift axis greater than or equal to array rank");
         }
-        auto mapping = [region=region, array] (auto&& index) { return array(region.map_index(index)); };
-        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, region.shape()));
+        if (std::size_t(std::abs(delta)) >= array.shape(axis_to_shift))
+        {
+            throw std::logic_error("cannot shift an array by more than its length on that axis");
+        }
+        auto mapping = [axis_to_shift=axis_to_shift, delta=delta, array] (auto index)
+        {
+            index[axis_to_shift] -= delta;
+            return array(index);
+        };
+        auto shape = array.shape();
+        shape[axis_to_shift] -= std::abs(delta);
+
+        return make_array(mapping, shape);
     }
 
-    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
-    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
-    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
-    auto from   (index_t<Rank> arg) const { return selector_t(region.with_start(arg)); }
-    auto to     (index_t<Rank> arg) const { return selector_t(region.with_final(arg)); }
-    auto jumping(jumps_t<Rank> arg) const { return selector_t(region.with_jumps(arg)); }
+    auto along_axis(std::size_t new_axis_to_shift) const
+    {
+        return axis_shifter_t(new_axis_to_shift, delta);
+    }
 
 private:
     //=========================================================================
-    access_pattern_t<Rank> region;
+    std::size_t axis_to_shift;
+    int delta;
+};
+
+
+
+
+//=============================================================================
+template<std::size_t RankDifference>
+class nd::axis_freezer_t
+{
+public:
+
+    //=========================================================================
+    axis_freezer_t(
+        index_t<RankDifference> axes_to_freeze,
+        index_t<RankDifference> index_to_freeze_at=make_uniform_index<RankDifference>(0))
+    : axes_to_freeze(axes_to_freeze)
+    , index_to_freeze_at(index_to_freeze_at) {}
+
+    template<typename PatchArrayType>
+    auto operator()(PatchArrayType array) const
+    {
+        for (auto a : axes_to_freeze)
+            if (a >= array.rank())
+                throw std::logic_error("cannot freeze axis greater than or equal to array rank");
+
+        auto mapping = [axes_to_freeze=axes_to_freeze, index_to_freeze_at=index_to_freeze_at, array] (auto&& index)
+        {
+            return array(index.insert_elements(axes_to_freeze, index_to_freeze_at));
+        };
+        auto shape = array.shape().remove_elements(axes_to_freeze);
+
+        return make_array(mapping, shape);
+    }
+
+    auto at_index(index_t<RankDifference> new_index_to_freeze_at) const
+    {
+        return axis_freezer_t(axes_to_freeze, new_index_to_freeze_at);
+    }
+
+    template<typename... Args>
+    auto at_index(Args... new_index_to_freeze_at) const
+    {
+        static_assert(sizeof...(Args) == RankDifference);
+        return at_index(make_index(new_index_to_freeze_at...));
+    }
+
+private:
+    //=========================================================================
+    index_t<RankDifference> axes_to_freeze;
+    index_t<RankDifference> index_to_freeze_at;
+};
+
+
+
+
+//=============================================================================
+template<typename OperatorType>
+class nd::axis_reducer_t
+{
+public:
+
+    //=========================================================================
+    axis_reducer_t(std::size_t axis_to_reduce, OperatorType the_operator)
+    : axis_to_reduce(axis_to_reduce)
+    , the_operator(the_operator) {}
+
+    template<typename ArrayType>
+    auto operator()(ArrayType array) const
+    {
+        if (axis_to_reduce >= array.rank())
+        {
+            throw std::logic_error("cannot reduce axis greater than or equal to array rank");
+        }
+        constexpr std::size_t R = ArrayType::array_rank;
+
+        auto mapping = [the_operator=the_operator, axis_to_reduce=axis_to_reduce, array] (auto&& index)
+        {
+            auto axes_to_freeze = range_index<R>().remove_elements(make_index(axis_to_reduce));
+            auto freezer = axis_freezer_t<R - 1>(axes_to_freeze).at_index(index);
+            return the_operator(freezer(array));
+        };
+        auto shape = array.shape().remove_elements(make_index(axis_to_reduce));
+
+        return make_array(mapping, shape);
+    }
+
+    auto along_axis(std::size_t new_axis_to_reduce) const
+    {
+        return axis_reducer_t(new_axis_to_reduce, the_operator);
+    }
+
+private:
+    //=========================================================================
+    template<std::size_t Rank>
+    static index_t<Rank> range_index()
+    {
+        auto result = index_t<Rank>();
+
+        for (std::size_t n = 0; n < Rank; ++n)
+            result[n] = n;
+
+        return result;
+    };
+
+    std::size_t axis_to_reduce;
+    OperatorType the_operator;
+};
+
+
+
+
+//=============================================================================
+template<typename ArrayType>
+class nd::concatenator_t
+{
+public:
+
+    //=========================================================================
+    concatenator_t(std::size_t axis_to_extend, ArrayType array_to_concat)
+    : axis_to_extend(axis_to_extend)
+    , array_to_concat(array_to_concat) {}
+
+    template<typename SourceArrayType>
+    auto operator()(SourceArrayType array) const
+    {
+        if (axis_to_extend >= array.rank())
+        {
+            throw std::logic_error("cannot concatenate on axis greater than or equal to array rank");
+        }
+        if (array_to_concat.shape().remove_elements(make_index(axis_to_extend))
+            !=        array.shape().remove_elements(make_index(axis_to_extend)))
+        {
+            throw std::logic_error("the shape of the concatenated arrays can only differ on the concatenating axis");
+        }
+
+        auto mapping = [axis_to_extend=axis_to_extend, array_to_concat=array_to_concat, array] (auto index)
+        {
+            if (index[axis_to_extend] >= array.shape(axis_to_extend))
+            {
+                index[axis_to_extend] -= array.shape(axis_to_extend);
+                return array_to_concat(index);
+            }
+            return array(index);
+        };
+
+        auto shape = array.shape();
+        shape[axis_to_extend] += array_to_concat.shape(axis_to_extend);
+
+        return make_array(mapping, shape);
+    }
+
+    auto on_axis(std::size_t new_axis_to_concat) const
+    {
+        return concatenator_t(new_axis_to_concat, array_to_concat);
+    }
+
+private:
+    //=========================================================================
+    std::size_t axis_to_extend;
+    ArrayType array_to_concat;
 };
 
 
@@ -1153,149 +1116,35 @@ private:
 
 
 //=============================================================================
-template<std::size_t RankDifference>
-class nd::axis_freezer_t
+template<std::size_t Rank>
+class nd::selector_t
 {
 public:
 
     //=========================================================================
-    axis_freezer_t(
-        index_t<RankDifference> axes_to_freeze,
-        index_t<RankDifference> index_to_freeze_at=make_uniform_index<RankDifference>(0))
-    : axes_to_freeze(axes_to_freeze)
-    , index_to_freeze_at(index_to_freeze_at) {}
-
-    template<typename PatchArrayType>
-    auto operator()(PatchArrayType array) const
-    {
-        if (any_of(axes_to_freeze, [array] (auto a) { return a >= array.rank(); }))
-        {
-            throw std::logic_error("cannot freeze axis greater than or equal to array rank");
-        }
-        auto mapping = [axes_to_freeze=axes_to_freeze, index_to_freeze_at=index_to_freeze_at, array] (auto&& index)
-        {
-            return array(index.insert_elements(axes_to_freeze, index_to_freeze_at));
-        };
-        auto shape = array.shape().remove_elements(axes_to_freeze);
-
-        return make_array(mapping, shape);
-    }
-
-    auto at_index(index_t<RankDifference> new_index_to_freeze_at) const
-    {
-        return axis_freezer_t(axes_to_freeze, new_index_to_freeze_at);
-    }
-
-    template<typename... Args>
-    auto at_index(Args... new_index_to_freeze_at) const
-    {
-        static_assert(sizeof...(Args) == RankDifference);
-        return at_index(make_index(new_index_to_freeze_at...));
-    }
-
-private:
-    //=========================================================================
-    index_t<RankDifference> axes_to_freeze;
-    index_t<RankDifference> index_to_freeze_at;
-};
-
-
-
-
-//=============================================================================
-template<typename OperatorType>
-class nd::axis_reducer_t
-{
-public:
-
-    //=========================================================================
-    axis_reducer_t(std::size_t axis_to_reduce, OperatorType the_operator)
-    : axis_to_reduce(axis_to_reduce)
-    , the_operator(the_operator) {}
+    selector_t(access_pattern_t<Rank> region=access_pattern_t<Rank>()) : region(region) {}
 
     template<typename ArrayType>
-    auto operator()(ArrayType array) const
+    auto operator()(ArrayType&& array) const
     {
-        if (axis_to_reduce >= array.rank())
+        if (! region.within(array.shape()))
         {
-            throw std::logic_error("cannot reduce axis greater than or equal to array rank");
+            throw std::logic_error("out-of-bounds selection");
         }
-        constexpr std::size_t R = ArrayType::array_rank;
-
-        auto mapping = [the_operator=the_operator, axis_to_reduce=axis_to_reduce, array] (auto&& index)
-        {
-            auto axes_to_freeze = index_t<R>::from_range(range(R)).remove_elements(make_index(axis_to_reduce));
-            auto freezer = axis_freezer_t<R - 1>(axes_to_freeze).at_index(index);
-            return the_operator(freezer(array));
-        };
-        auto shape = array.shape().remove_elements(make_index(axis_to_reduce));
-
-        return make_array(mapping, shape);
+        auto mapping = [region=region, array] (auto&& index) { return array(region.map_index(index)); };
+        return make_array(basic_provider_t<decltype(mapping), Rank>(mapping, region.shape()));
     }
 
-    auto along_axis(std::size_t new_axis_to_reduce) const
-    {
-        return axis_reducer_t(new_axis_to_reduce, the_operator);
-    }
+    template<typename... Args> auto from   (Args... args) const { return from   (make_index(args...)); }
+    template<typename... Args> auto to     (Args... args) const { return to     (make_index(args...)); }
+    template<typename... Args> auto jumping(Args... args) const { return jumping(make_jumps(args...)); }
+    auto from   (index_t<Rank> arg) const { return selector_t(region.with_start(arg)); }
+    auto to     (index_t<Rank> arg) const { return selector_t(region.with_final(arg)); }
+    auto jumping(jumps_t<Rank> arg) const { return selector_t(region.with_jumps(arg)); }
 
 private:
     //=========================================================================
-    std::size_t axis_to_reduce;
-    OperatorType the_operator;
-};
-
-
-
-
-//=============================================================================
-template<typename ArrayType>
-class nd::concatenator_t
-{
-public:
-
-    //=========================================================================
-    concatenator_t(std::size_t axis_to_extend, ArrayType array_to_concat)
-    : axis_to_extend(axis_to_extend)
-    , array_to_concat(array_to_concat) {}
-
-    template<typename SourceArrayType>
-    auto operator()(SourceArrayType array) const
-    {
-        if (axis_to_extend >= array.rank())
-        {
-            throw std::logic_error("cannot concatenate on axis greater than or equal to array rank");
-        }
-        if (array_to_concat.shape().remove_elements(make_index(axis_to_extend))
-            !=        array.shape().remove_elements(make_index(axis_to_extend)))
-        {
-            throw std::logic_error("the shape of the concatenated arrays can only differ on the concatenating axis");
-        }
-
-        auto mapping = [axis_to_extend=axis_to_extend, array_to_concat=array_to_concat, array] (auto index)
-        {
-            if (index[axis_to_extend] >= array.shape(axis_to_extend))
-            {
-                index[axis_to_extend] -= array.shape(axis_to_extend);
-                return array_to_concat(index);
-            }
-            return array(index);
-        };
-
-        auto shape = array.shape();
-        shape[axis_to_extend] += array_to_concat.shape(axis_to_extend);
-
-        return make_array(mapping, shape);
-    }
-
-    auto on_axis(std::size_t new_axis_to_concat) const
-    {
-        return concatenator_t(new_axis_to_concat, array_to_concat);
-    }
-
-private:
-    //=========================================================================
-    std::size_t axis_to_extend;
-    ArrayType array_to_concat;
+    access_pattern_t<Rank> region;
 };
 
 
@@ -1467,18 +1316,6 @@ public:
         return *this;
     }
 
-    bool operator==(const buffer_t& other) const
-    {
-        return count == other.count
-        && all_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) == std::get<1>(t); });
-    }
-
-    bool operator!=(const buffer_t& other) const
-    {
-        return count != other.count
-        || any_of(zip(*this, other), [] (const auto& t) { return std::get<0>(t) != std::get<1>(t); });
-    }
-
     bool empty() const { return count == 0; }
     std::size_t size() const { return count; }
 
@@ -1640,10 +1477,11 @@ auto nd::make_array_from(const ContainerType& container)
 {
     auto shape = make_shape(container.size());
     auto result = make_unique_array<typename ContainerType::value_type>(shape);
+    auto n = std::size_t(0);
 
-    for (auto [n, source_value] : enumerate(container))
+    for (auto source_value : container)
     {
-        result(n) = source_value;
+        result(n++) = source_value;
     }
     return std::move(result).shared();
 }

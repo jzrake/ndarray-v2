@@ -31,10 +31,10 @@ TEST_CASE("shapes support insertion and removal of elements")
     REQUIRE(shape.insert_elements(nd::make_index(3, 4), nd::make_shape(8, 9)) == nd::make_shape(0, 1, 2, 8, 9));
 }
 
-TEST_CASE("range can be constructed", "[distance] [enumerate] [range]")
-{
-    REQUIRE(nd::distance(nd::enumerate(nd::range(10))) == 10);
-}
+// TEST_CASE("range can be constructed", "[distance] [enumerate] [range]")
+// {
+//     REQUIRE(nd::distance(nd::enumerate(nd::range(10))) == 10);
+// }
 
 TEST_CASE("buffer works as expected", "[buffer]")
 {
@@ -87,34 +87,6 @@ TEST_CASE("buffer works as expected", "[buffer]")
         REQUIRE(C[0] == 1.5);
         REQUIRE(C[99] == 1.5);
     }
-
-    SECTION("equality operators between buffers work correctly")
-    {
-        nd::buffer_t<double> A(100, 1.5);   
-        nd::buffer_t<double> B(100, 1.5);
-        nd::buffer_t<double> C(200, 1.5);
-        nd::buffer_t<double> D(100, 2.0);
-
-        REQUIRE(A == A);
-        REQUIRE(A == B);
-        REQUIRE(A != C);
-        REQUIRE(A != D);
-
-        REQUIRE(B == A);
-        REQUIRE(B == B);
-        REQUIRE(B != C);
-        REQUIRE(B != D);
-
-        REQUIRE(C != A);
-        REQUIRE(C != B);
-        REQUIRE(C == C);
-        REQUIRE(C != D);
-
-        REQUIRE(D != A);
-        REQUIRE(D != B);
-        REQUIRE(D != C);
-        REQUIRE(D == D);
-    }
 }
 
 TEST_CASE("access patterns work OK", "[access_pattern]")
@@ -127,7 +99,6 @@ TEST_CASE("access patterns work OK", "[access_pattern]")
     SECTION("can be iterated over")
     {
         auto pat = nd::make_access_pattern(5, 5);
-        REQUIRE(nd::distance(pat) == long(pat.size()));
         REQUIRE(pat.contains(0, 0));
         REQUIRE_FALSE(pat.contains(0, 5));
         REQUIRE_FALSE(pat.contains(5, 0));
