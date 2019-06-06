@@ -283,69 +283,6 @@ TEST_CASE("array reductions work", "[array]")
     REQUIRE((A | nd::max()) == 2);
 }
 
-
-
-
-// TEST_CASE("can zip, transform, enumerate a range", "[range] [transform] [zip] [divvy]")
-// {
-//     auto n = 0;
-
-//     for (auto a : nd::range(10) | nd::transform([] (auto a) { return 2 * a; }))
-//     {
-//         REQUIRE(a == 2 * n);
-//         ++n;
-//     }
-//     for (auto&& [m, n] : nd::zip(nd::range(10), nd::range(10)))
-//     {
-//         REQUIRE(m == n);
-//     }
-//     for (auto&& [m, n] : enumerate(nd::range(10)))
-//     {
-//         REQUIRE(m == n);
-//     }
-
-//     REQUIRE(nd::divvy(10)(nd::range(10)).size() == 10);
-//     REQUIRE(nd::divvy(4)(nd::range(100)).size() == 4);
-//     REQUIRE(nd::divvy(3)(nd::range(100)).size() == 3);
-
-//     n = 0;
-
-//     for (auto group : nd::range(20) | nd::divvy(3))
-//     {
-//         for (auto item : group)
-//         {
-//             REQUIRE(item == n);
-//             ++n;
-//         }
-//     }
-//     REQUIRE(n == 20);
-
-//     n = 0;
-
-//     for (auto group : nd::range(20) | nd::divvy(5))
-//     {
-//         for (auto item : group)
-//         {
-//             REQUIRE(item == n);
-//             ++n;
-//         }
-//     }
-//     REQUIRE(n == 20);
-
-//     n = 0;
-
-//     for (auto group : nd::range(20) | nd::divvy(22))
-//     {
-//         for (auto item : group)
-//         {
-//             REQUIRE(item == n);
-//             ++n;
-//         }
-//     }
-//     REQUIRE(n == 20);
-// }
-
-
 TEST_CASE("buffer works as expected", "[buffer]")
 {
     SECTION("can instantiate an empty buffer")
@@ -505,33 +442,25 @@ TEST_CASE("bounds checking operator works as expected", "[bounds_check]")
     REQUIRE_THROWS (A2(10, 10));
 }
 
-// TEST_CASE("providers can be reshaped", "[unique_provider] [shared_provider] [reshape]")
-// {
-//     SECTION("unique")
-//     {
-//         auto provider = nd::make_unique_provider<double>(10, 10);
-//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(10, 10)));
-//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 20)));
-//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 5, 4)));
-//         REQUIRE_THROWS(provider.reshape(nd::make_shape(10, 10, 10)));
-//     }
-//     SECTION("shared")
-//     {
-//         auto provider = nd::make_shared_provider<double>(10, 10);
-//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(10, 10)));
-//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 20)));
-//         REQUIRE_NOTHROW(provider.reshape(nd::make_shape(5, 5, 4)));
-//         REQUIRE_THROWS(provider.reshape(nd::make_shape(10, 10, 10)));
-//         REQUIRE(provider.reshape(nd::make_shape(5, 5, 4)).data() == provider.data());
-//     }
-// }
+TEST_CASE("can divvy an array", "[divvy]")
+{
+    REQUIRE((nd::range(100) | nd::divvy(10)).size() == 10);
+    REQUIRE((nd::range(100) | nd::divvy(10) | nd::read_index(0)).size() == 10);
+    REQUIRE((nd::range(100) | nd::divvy(10) | nd::read_index(0))(0) == 0);
+    REQUIRE((nd::range(100) | nd::divvy(10) | nd::read_index(0))(1) == 1);
+    REQUIRE((nd::range(100) | nd::divvy(10) | nd::read_index(1))(0) == 10);
+    REQUIRE((nd::range(100) | nd::divvy(10) | nd::read_index(1))(1) == 11);
 
-// TEST_CASE("arrays can be reshaped given a reshapable provider", "[unique_provider] [reshape]")
-// {
-//     auto A = nd::make_array(nd::make_unique_provider<double>(10, 10));
-//     REQUIRE_NOTHROW(A | nd::reshape(2, 50));
-//     REQUIRE_THROWS(A | nd::reshape(2, 51));
-// }
+    int n = 0;
+
+    for (auto group : nd::range(21) | nd::divvy(5))
+    {
+        for (auto x : group)
+        {
+            REQUIRE(x == n++);
+        }
+    }
+}
 
 TEST_CASE("replace operator works as expected", "[replace]")
 {

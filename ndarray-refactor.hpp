@@ -76,6 +76,7 @@ namespace nd
     inline                                             auto range(int count);
     inline                                             auto range(int start, int final, int step=1);
     inline                                             auto linspace(double x0, double x1, std::size_t count);
+    inline                                             auto divvy(std::size_t num_groups);
     template<typename Provider>                        auto make_array(Provider&& provider);
     template<typename Mapping, std::size_t Rank>       auto make_array(Mapping mapping, shape_t<Rank> shape);
     template<typename ValueType, std::size_t Rank>     auto make_shared_array(shape_t<Rank> shape);
@@ -1015,6 +1016,39 @@ auto nd::linspace(double x0, double x1, std::size_t count)
     {
         return x0 + (x1 - x0) * index[0] / (count - 1);
     }, nd::make_shape(count));
+}
+
+
+
+
+/**
+ * @brief      Return an operator that breaks up a 1d array into a 1d ragged
+ *             array of size num_groups, whose elements are arrays with
+ *             equitable size and whose disjoint union equals the original
+ *             array.
+ *
+ * @param[in]  num_groups  The number groups to divvy up on
+ *
+ * @return     The operator
+ * @note       This function is useful for parallelization tasks.
+ */
+auto nd::divvy(std::size_t num_groups)
+{
+    return [num_groups] (auto array)
+    {
+        static_assert(array.rank() == 1, "can only divvy a 1d array");
+
+        return make_array([num_groups, array] (auto group_index)
+        {
+            std::size_t start = (group_index[0] + 0) * array.size() / num_groups;
+            std::size_t final = (group_index[0] + 1) * array.size() / num_groups;
+
+            return make_array([array, start] (auto element_index)
+            {
+                return array(start + element_index[0]);
+            }, make_shape(final - start));
+        }, make_shape(num_groups));
+    };
 }
 
 
