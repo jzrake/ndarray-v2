@@ -239,17 +239,6 @@ TEST_CASE("ones, zeros array factories work as expected", "[ones] [zeros]")
     REQUIRE(B(5, 5) == 0.0);
 }
 
-TEST_CASE("uniform provider can be constructed", "[uniform_provider]")
-{
-    auto p = nd::make_uniform_provider(1.0, 10, 20, 40);
-    auto q = p.reshape(nd::make_shape(5, 2, 10, 2, 20, 2));
-    REQUIRE(p(nd::make_index(0, 0, 0)) == 1.0);
-    REQUIRE(p(nd::make_index(9, 19, 39)) == 1.0);
-    REQUIRE(q(nd::make_index(0, 0, 0, 0, 0, 0)) == 1.0);
-    REQUIRE(q(nd::make_index(4, 1, 9, 1, 19, 1)) == 1.0);
-    REQUIRE(p.size() == q.size());
-}
-
 TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider] [unique_provider]")
 {
     auto provider = nd::make_unique_provider<double>(20, 10, 5);
@@ -367,9 +356,9 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing all of an array works")
     {
-        auto A1 = nd::make_array(nd::make_uniform_provider(1.0, 10));
-        auto A2 = nd::make_array(nd::make_uniform_provider(2.0, 10));
         auto patch = nd::make_access_pattern(10);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(10) * 2.0;
         auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
@@ -379,9 +368,9 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing the first half of an array with constant values works")
     {
-        auto A1 = nd::make_array(nd::make_uniform_provider(1.0, 10));
-        auto A2 = nd::make_array(nd::make_uniform_provider(2.0, 5));
         auto patch = nd::make_access_pattern(5);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(5) * 2.0;
         auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
@@ -391,9 +380,9 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing the second half of an array with constant values works")
     {
-        auto A1 = nd::make_array(nd::make_uniform_provider(1.0, 10));
-        auto A2 = nd::make_array(nd::make_uniform_provider(2.0, 5));
         auto patch = nd::make_access_pattern(10).with_start(5);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(5) * 2.0;
         auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())
@@ -403,9 +392,9 @@ TEST_CASE("replace operator works as expected", "[replace]")
     }
     SECTION("replacing the second half of an array with linear values works")
     {
+        auto patch = nd::make_access_pattern(10).with_start(5);
         auto A1 = nd::index_array(10);
         auto A2 = nd::index_array(5);
-        auto patch = nd::make_access_pattern(10).with_start(5);
         auto A3 = A1 | nd::replace(patch, A2);
 
         for (auto index : A3.indexes())

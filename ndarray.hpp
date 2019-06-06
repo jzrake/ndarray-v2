@@ -76,7 +76,6 @@ namespace nd
     template<typename Function,  std::size_t Rank> class basic_provider_t;
     template<typename ValueType, std::size_t Rank> class shared_provider_t;
     template<typename ValueType, std::size_t Rank> class unique_provider_t;
-    template<typename ValueType, std::size_t Rank> class uniform_provider_t;
 
 
     // provider factory functions
@@ -85,8 +84,6 @@ namespace nd
     template<typename ValueType, typename... Args>     auto make_shared_provider(Args... args);
     template<typename ValueType, std::size_t Rank>     auto make_unique_provider(shape_t<Rank> shape);
     template<typename ValueType, typename... Args>     auto make_unique_provider(Args... args);
-    template<typename ValueType, std::size_t Rank>     auto make_uniform_provider(ValueType value, shape_t<Rank> shape);
-    template<typename ValueType, typename... Args>     auto make_uniform_provider(ValueType value, Args... args);
     template<typename Provider>                        auto evaluate_as_shared(Provider&&);
     template<typename Provider>                        auto evaluate_as_unique(Provider&&);
 
@@ -168,16 +165,11 @@ namespace nd
     template<std::size_t Rank> auto to_string(const access_pattern_t<Rank>& region);
 
 
-    // array query support
-    //=========================================================================
-    template<typename ArrayType> using value_type_of = typename std::remove_reference_t<ArrayType>::value_type;
-    template<typename ArrayType> constexpr std::size_t rank(ArrayType&&) { return std::remove_reference_t<ArrayType>::rank; }
-
-
     // convenience typedef's
     //=========================================================================
     template<typename ValueType, std::size_t Rank> using shared_array = array_t<shared_provider_t<ValueType, Rank>>;
     template<typename ValueType, std::size_t Rank> using unique_array = array_t<unique_provider_t<ValueType, Rank>>;
+    template<typename ArrayType> using value_type_of = typename std::remove_reference_t<ArrayType>::value_type;
 
 
     // to_string overloads
@@ -1098,7 +1090,7 @@ public:
     template<typename ArrayType>
     auto operator()(ArrayType&& array) const
     {
-        if (axis_to_shift >= rank(array))
+        if (axis_to_shift >= array.rank())
         {
             throw std::logic_error("cannot shift axis greater than or equal to array rank");
         }
@@ -1146,7 +1138,7 @@ public:
     template<typename ArrayType>
     auto operator()(ArrayType&& array) const
     {
-        if (axis_to_select >= rank(array))
+        if (axis_to_select >= array.rank())
         {
             throw std::logic_error("cannot select axis greater than or equal to array rank");
         }
@@ -1290,7 +1282,7 @@ public:
     template<typename PatchArrayType>
     auto operator()(PatchArrayType array) const
     {
-        if (any_of(axes_to_freeze, [array] (auto a) { return a >= rank(array); }))
+        if (any_of(axes_to_freeze, [array] (auto a) { return a >= array.rank(); }))
         {
             throw std::logic_error("cannot freeze axis greater than or equal to array rank");
         }
@@ -1338,11 +1330,11 @@ public:
     template<typename ArrayType>
     auto operator()(ArrayType array) const
     {
-        if (axis_to_reduce >= rank(array))
+        if (axis_to_reduce >= array.rank())
         {
             throw std::logic_error("cannot reduce axis greater than or equal to array rank");
         }
-        constexpr std::size_t R = ArrayType::rank;
+        constexpr std::size_t R = ArrayType::array_rank;
 
         auto mapping = [the_operator=the_operator, axis_to_reduce=axis_to_reduce, array] (auto&& index)
         {
@@ -1383,7 +1375,7 @@ public:
     template<typename SourceArrayType>
     auto operator()(SourceArrayType array) const
     {
-        if (axis_to_extend >= rank(array))
+        if (axis_to_extend >= array.rank())
         {
             throw std::logic_error("cannot concatenate on axis greater than or equal to array rank");
         }
@@ -1430,7 +1422,7 @@ class nd::basic_provider_t
 public:
 
     using value_type = std::invoke_result_t<Function, index_t<Rank>>;
-    static constexpr std::size_t rank = Rank;
+    static constexpr std::size_t provider_rank = Rank;
 
     //=========================================================================
     basic_provider_t(Function mapping, shape_t<Rank> the_shape) : mapping(mapping), the_shape(the_shape) {}
@@ -1454,7 +1446,7 @@ class nd::shared_provider_t
 public:
 
     using value_type = ValueType;
-    static constexpr std::size_t rank = Rank;
+    static constexpr std::size_t provider_rank = Rank;
 
     //=========================================================================
     shared_provider_t() {}
@@ -1496,7 +1488,7 @@ class nd::unique_provider_t
 public:
 
     using value_type = ValueType;
-    static constexpr std::size_t rank = Rank;
+    static constexpr std::size_t provider_rank = Rank;
 
     //=========================================================================
     unique_provider_t(nd::shape_t<Rank> the_shape, nd::buffer_t<ValueType>&& buffer)
@@ -1531,31 +1523,6 @@ private:
     shape_t<Rank> the_shape;
     memory_strides_t<Rank> strides;
     buffer_t<ValueType> buffer;
-};
-
-
-
-
-//=============================================================================
-template<typename ValueType, std::size_t Rank>
-class nd::uniform_provider_t
-{
-public:
-
-    using value_type = ValueType;
-    static constexpr std::size_t rank = Rank;
-
-    //=========================================================================
-    uniform_provider_t(shape_t<Rank> the_shape, ValueType the_value) : the_shape(the_shape), the_value(the_value) {}
-    const ValueType& operator()(const index_t<Rank>&) const { return the_value; }
-    auto shape() const { return the_shape; }
-    auto size() const { return the_shape.volume(); }
-    template<std::size_t NewRank> auto reshape(shape_t<NewRank> new_shape) const { return uniform_provider_t<ValueType, NewRank>(new_shape, the_value); }
-
-private:
-    //=========================================================================
-    shape_t<Rank> the_shape;
-    ValueType the_value;
 };
 
 
@@ -1670,18 +1637,6 @@ private:
 
 
 
-
-template<typename ValueType, std::size_t Rank>
-auto nd::make_uniform_provider(ValueType value, shape_t<Rank> shape)
-{
-    return uniform_provider_t<ValueType, Rank>(shape, value);
-}
-
-template<typename ValueType, typename... Args>
-auto nd::make_uniform_provider(ValueType value, Args... args)
-{
-    return make_uniform_provider(value, make_shape(args...));
-}
 
 template<typename ValueType, std::size_t Rank>
 auto nd::make_shared_provider(shape_t<Rank> shape)
@@ -1923,7 +1878,7 @@ auto nd::linspace(ValueType x0, ValueType x1, std::size_t count)
 template<typename... ArrayTypes>
 auto nd::zip_arrays(ArrayTypes... arrays)
 {
-    constexpr std::size_t Ranks[] = {ArrayTypes::rank...};
+    constexpr std::size_t Ranks[] = {ArrayTypes::array_rank...};
     shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
 
     if (std::adjacent_find(std::begin(shapes), std::end(shapes), std::not_equal_to<>()) != std::end(shapes))
@@ -2016,7 +1971,7 @@ auto nd::meshgrid(ArrayTypes... arrays)
 template<typename ValueType, typename... Args>
 auto nd::zeros(Args... args)
 {
-    return make_array(make_uniform_provider(ValueType(0), args...));
+    return make_array([] (auto) { return ValueType(0); }, make_shape(std::size_t(args)...));
 }
 
 
@@ -2036,7 +1991,7 @@ auto nd::zeros(Args... args)
 template<typename ValueType, typename... Args>
 auto nd::ones(Args... args)
 {
-    return make_array(make_uniform_provider(ValueType(1), args...));
+    return make_array([] (auto) { return ValueType(1); }, make_shape(std::size_t(args)...));
 }
 
 
@@ -2062,7 +2017,7 @@ auto nd::promote(Arg arg, nd::shape_t<Rank> shape)
     }
     else
     {
-        return make_array(make_uniform_provider(arg, shape));
+        return make_array([arg] (auto) { return arg; }, shape);
     }
 }
 
@@ -2332,7 +2287,7 @@ template<typename ArrayType>
 auto nd::where(ArrayType array)
 {
     auto bool_array = array | map([] (auto x) { return bool(x); });
-    auto index_list = make_unique_array<index_t<rank(bool_array)>>(bool_array | sum());
+    auto index_list = make_unique_array<index_t<bool_array.rank()>>(bool_array | sum());
 
     std::size_t n = 0;
 
@@ -2558,7 +2513,7 @@ auto nd::select_from(Args... args)
 template<std::size_t Rank>
 auto nd::replace_from(index_t<Rank> starting_index)
 {
-    auto zeros = make_array(make_uniform_provider(0, make_uniform_shape<Rank>(1)));
+    auto zeros = make_array([] (auto) { return 0; }, make_uniform_shape<Rank>(1));
     return replacer_t<Rank, decltype(zeros)>({}, zeros).from(starting_index);
 }
 
@@ -2668,39 +2623,57 @@ class nd::array_t
 {
 public:
 
+
+
+    //=========================================================================
     using provider_type = Provider;
     using value_type = typename Provider::value_type;
     using is_ndarray = std::true_type;
+    static constexpr std::size_t array_rank = Provider::provider_rank;
 
-    static constexpr std::size_t rank = Provider::rank;
+
+
 
     //=========================================================================
     array_t() {}
     array_t(Provider&& provider) : provider(std::move(provider)) {}
 
+
+
+
     // indexing functions
     //=========================================================================
     template<typename... Args> decltype(auto) operator()(Args... args) const { return provider(make_index(args...)); }
     template<typename... Args> decltype(auto) operator()(Args... args)       { return provider(make_index(args...)); }
-    decltype(auto) operator()(const index_t<rank>& index) const { return provider(index); }
-    decltype(auto) operator()(const index_t<rank>& index)       { return provider(index); }
+    decltype(auto) operator()(const index_t<array_rank>& index) const { return provider(index); }
+    decltype(auto) operator()(const index_t<array_rank>& index)       { return provider(index); }
     decltype(auto) data() const { return provider.data(); }
     decltype(auto) data()       { return provider.data(); }
+    constexpr std::size_t rank() const { return array_rank; }
+
+
+
 
     // query functions and operator support
     //=========================================================================
     auto shape() const { return provider.shape(); }
     auto shape(std::size_t axis) const { return provider.shape()[axis]; }
     auto size() const { return provider.size(); }
-    const Provider& get_provider() const { return provider; }
     auto indexes() const { return make_access_pattern(provider.shape()); }
+    const Provider& get_provider() const { return provider; }
     template<typename Function> auto operator|(Function&& fn) const & { return fn(*this); }
     template<typename Function> auto operator|(Function&& fn)      && { return fn(std::move(*this)); }
+
+
+
 
     // methods converting this to a memory-backed array
     //=========================================================================
     auto unique() const { return make_array(evaluate_as_unique(provider)); }
     auto shared() const { return make_array(evaluate_as_shared(provider)); }
+
+
+
 
     // arithmetic operators
     //=========================================================================
@@ -2718,6 +2691,9 @@ public:
     template<typename T> auto operator>(T&& A) const { return bin_op(std::forward<T>(A), std::greater<>()); }
     auto operator-() const { return *this | map(std::negate<>()); }
     auto operator!() const { return *this | map(std::logical_not<>()); }
+
+
+
 
 private:
     //=========================================================================
