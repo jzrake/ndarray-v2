@@ -1,6 +1,37 @@
+/**
+ ==============================================================================
+ Copyright 2019, Jonathan Zrake
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy of
+ this software and associated documentation files (the "Software"), to deal in
+ the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do
+ so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
+ ==============================================================================
+*/
+
+
+
+
+// work-around for g++ bug on MacOS, include something from C++ standard lib
+// before anything else:
+#include <tuple>
 #include "sequence.hpp"
 #include "catch.hpp"
-#include "ndarray-refactor.hpp"
+#include "ndarray.hpp"
 
 
 
@@ -462,132 +493,132 @@ TEST_CASE("can divvy an array", "[divvy]")
     }
 }
 
-// TEST_CASE("replace operator works as expected", "[replace]")
-// {
-//     SECTION("trying to replace a region with an array of the wrong size throws")
-//     {
-//         auto A1 = nd::ones(10);
-//         auto A2 = nd::ones(5);
-//         auto patch1 = nd::make_access_pattern(10).with_start(5);
-//         auto patch2 = nd::make_access_pattern(10).with_start(6);
-//         REQUIRE_NOTHROW(nd::replace(patch1, A2));
-//         REQUIRE_THROWS(A1 | nd::replace(patch2, A2));
-//     }
-//     SECTION("replacing all of an array works")
-//     {
-//         auto patch = nd::make_access_pattern(10);
-//         auto A1 = nd::ones<double>(10);
-//         auto A2 = nd::ones<double>(10) * 2.0;
-//         auto A3 = A1 | nd::replace(patch, A2);
+TEST_CASE("replace operator works as expected", "[replace]")
+{
+    SECTION("trying to replace a region with an array of the wrong size throws")
+    {
+        auto A1 = nd::ones(10);
+        auto A2 = nd::ones(5);
+        auto patch1 = nd::make_access_pattern(10).with_start(5);
+        auto patch2 = nd::make_access_pattern(10).with_start(6);
+        REQUIRE_NOTHROW(nd::replace(patch1, A2));
+        REQUIRE_THROWS(A1 | nd::replace(patch2, A2));
+    }
+    SECTION("replacing all of an array works")
+    {
+        auto patch = nd::make_access_pattern(10);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(10) * 2.0;
+        auto A3 = A1 | nd::replace(patch, A2);
 
-//         for (auto index : A3.indexes())
-//         {
-//             REQUIRE(A3(index) == 2.0);
-//         }
-//     }
-//     SECTION("replacing the first half of an array with constant values works")
-//     {
-//         auto patch = nd::make_access_pattern(5);
-//         auto A1 = nd::ones<double>(10);
-//         auto A2 = nd::ones<double>(5) * 2.0;
-//         auto A3 = A1 | nd::replace(patch, A2);
+        for (auto index : A3.indexes())
+        {
+            REQUIRE(A3(index) == 2.0);
+        }
+    }
+    SECTION("replacing the first half of an array with constant values works")
+    {
+        auto patch = nd::make_access_pattern(5);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(5) * 2.0;
+        auto A3 = A1 | nd::replace(patch, A2);
 
-//         for (auto index : A3.indexes())
-//         {
-//             REQUIRE(A3(index) == (index[0] < 5 ? 2.0 : 1.0));
-//         }
-//     }
-//     SECTION("replacing the second half of an array with constant values works")
-//     {
-//         auto patch = nd::make_access_pattern(10).with_start(5);
-//         auto A1 = nd::ones<double>(10);
-//         auto A2 = nd::ones<double>(5) * 2.0;
-//         auto A3 = A1 | nd::replace(patch, A2);
+        for (auto index : A3.indexes())
+        {
+            REQUIRE(A3(index) == (index[0] < 5 ? 2.0 : 1.0));
+        }
+    }
+    SECTION("replacing the second half of an array with constant values works")
+    {
+        auto patch = nd::make_access_pattern(10).with_start(5);
+        auto A1 = nd::ones<double>(10);
+        auto A2 = nd::ones<double>(5) * 2.0;
+        auto A3 = A1 | nd::replace(patch, A2);
 
-//         for (auto index : A3.indexes())
-//         {
-//             REQUIRE(A3(index) == (index[0] < 5 ? 1.0 : 2.0));
-//         }
-//     }
-//     SECTION("replacing the second half of an array with linear values works")
-//     {
-//         auto patch = nd::make_access_pattern(10).with_start(5);
-//         auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
-//         auto A2 = nd::make_array([] (auto i) { return i; }, nd::make_shape(5));
-//         auto A3 = A1 | nd::replace(patch, A2);
+        for (auto index : A3.indexes())
+        {
+            REQUIRE(A3(index) == (index[0] < 5 ? 1.0 : 2.0));
+        }
+    }
+    SECTION("replacing the second half of an array with linear values works")
+    {
+        auto patch = nd::make_access_pattern(10).with_start(5);
+        auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
+        auto A2 = nd::make_array([] (auto i) { return i; }, nd::make_shape(5));
+        auto A3 = A1 | nd::replace(patch, A2);
 
-//         for (auto index : A3.indexes())
-//         {
-//             REQUIRE(A3(index)[0] == (index[0] < 5 ? index[0] : index[0] - 5));
-//         }
-//     }
-//     SECTION("replacing every other value works")
-//     {
-//         auto patch = nd::make_access_pattern(10).with_start(0).with_jumps(2);
-//         auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
-//         auto A2 = nd::make_array([] (auto i) { return i; }, nd::make_shape(5));
-//         auto A3 = A1 | nd::replace(patch, A2);
+        for (auto index : A3.indexes())
+        {
+            REQUIRE(A3(index)[0] == (index[0] < 5 ? index[0] : index[0] - 5));
+        }
+    }
+    SECTION("replacing every other value works")
+    {
+        auto patch = nd::make_access_pattern(10).with_start(0).with_jumps(2);
+        auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
+        auto A2 = nd::make_array([] (auto i) { return i; }, nd::make_shape(5));
+        auto A3 = A1 | nd::replace(patch, A2);
 
-//         for (auto index : A3.indexes())
-//         {
-//             REQUIRE(A3(index)[0] == (index[0] % 2 == 0 ? index[0] / 2 : index[0]));
-//         }
-//     }
-//     SECTION("replace_from operator works", "[replace_from]")
-//     {
-//         auto A = nd::zeros(10, 10);
-//         REQUIRE_NOTHROW(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 5)));
-//         REQUIRE_THROWS(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 6)));
-//     }
-// }
+        for (auto index : A3.indexes())
+        {
+            REQUIRE(A3(index)[0] == (index[0] % 2 == 0 ? index[0] / 2 : index[0]));
+        }
+    }
+    SECTION("replace_from operator works", "[replace_from]")
+    {
+        auto A = nd::zeros(10, 10);
+        REQUIRE_NOTHROW(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 5)));
+        REQUIRE_THROWS(A | nd::replace_from(0, 0).to(10, 5).with(nd::ones(10, 6)));
+    }
+}
 
-// TEST_CASE("select operator works as expected", "[select]")
-// {
-//     SECTION("with index array")
-//     {
-//         auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
-//         auto A2 = A1 | nd::select(nd::make_access_pattern(5));
-//         auto A3 = A1 | nd::select(nd::make_access_pattern(10).with_start(5));
-//         REQUIRE(A2.shape() == nd::make_shape(5));
-//         REQUIRE(A3.shape() == nd::make_shape(5));
-//         REQUIRE(A2(0) == nd::make_index(0));
-//         REQUIRE(A3(0) == nd::make_index(5));
-//         REQUIRE_NOTHROW(A1 | nd::select(nd::make_access_pattern(10)));
-//         REQUIRE_THROWS(A1 | nd::select(nd::make_access_pattern(11)));
-//     }
-//     SECTION("with shared array")
-//     {
-//         auto A1 = nd::make_unique_array<double>(10, 10);
-//         auto A2 = A1 | nd::to_shared() | nd::select(nd::make_access_pattern(5, 5));
-//         A1(0, 0) = 1.0;
-//         REQUIRE(A1(0, 0) == 1.0);
-//         REQUIRE(A2(0, 0) == 0.0);
-//         REQUIRE(A2.shape() == nd::make_shape(5, 5));
-//     }
-// }
+TEST_CASE("select operator works as expected", "[select]")
+{
+    SECTION("with index array")
+    {
+        auto A1 = nd::make_array([] (auto i) { return i; }, nd::make_shape(10));
+        auto A2 = A1 | nd::select(nd::make_access_pattern(5));
+        auto A3 = A1 | nd::select(nd::make_access_pattern(10).with_start(5));
+        REQUIRE(A2.shape() == nd::make_shape(5));
+        REQUIRE(A3.shape() == nd::make_shape(5));
+        REQUIRE(A2(0) == nd::make_index(0));
+        REQUIRE(A3(0) == nd::make_index(5));
+        REQUIRE_NOTHROW(A1 | nd::select(nd::make_access_pattern(10)));
+        REQUIRE_THROWS(A1 | nd::select(nd::make_access_pattern(11)));
+    }
+    SECTION("with shared array")
+    {
+        auto A1 = nd::make_unique_array<double>(10, 10);
+        auto A2 = A1 | nd::to_shared() | nd::select(nd::make_access_pattern(5, 5));
+        A1(0, 0) = 1.0;
+        REQUIRE(A1(0, 0) == 1.0);
+        REQUIRE(A2(0, 0) == 0.0);
+        REQUIRE(A2.shape() == nd::make_shape(5, 5));
+    }
+}
 
-// TEST_CASE("select_axis operator works as expected", "[select_axis]")
-// {
-//     auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(10, 10));
+TEST_CASE("select_axis operator works as expected", "[select_axis]")
+{
+    auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(10, 10));
 
-//     REQUIRE((A | nd::select_axis(0).from(2).to(8)).shape() == nd::make_shape(6, 10));
-//     REQUIRE((A | nd::select_axis(1).from(2).to(8)).shape() == nd::make_shape(10, 6));
-//     REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end()).shape() == nd::make_shape(6, 10));
-//     REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end()).shape() == nd::make_shape(10, 6));
+    REQUIRE((A | nd::select_axis(0).from(2).to(8)).shape() == nd::make_shape(6, 10));
+    REQUIRE((A | nd::select_axis(1).from(2).to(8)).shape() == nd::make_shape(10, 6));
+    REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end()).shape() == nd::make_shape(6, 10));
+    REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end()).shape() == nd::make_shape(10, 6));
 
-//     REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(2, 0));
-//     REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(0, 2));
-// }
+    REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(2, 0));
+    REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(0, 2));
+}
 
-// TEST_CASE("freeze_axis operator works as expected", "[freeze_axis]")
-// {
-//     auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(10, 10));
-//     REQUIRE((A | nd::freeze_axis(0).at_index(5)).shape() == nd::make_shape(10));
-//     REQUIRE((A | nd::freeze_axis(0).at_index(5))(0) == nd::make_index(5, 0));
-//     REQUIRE((A | nd::freeze_axis(0).at_index(5))(5) == nd::make_index(5, 5));
-//     REQUIRE((A | nd::freeze_axis(1).at_index(5))(0) == nd::make_index(0, 5));
-//     REQUIRE((A | nd::freeze_axis(1).at_index(5))(5) == nd::make_index(5, 5));
-// }
+TEST_CASE("freeze_axis operator works as expected", "[freeze_axis]")
+{
+    auto A = nd::make_array([] (auto i) { return i; }, nd::make_shape(10, 10));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5)).shape() == nd::make_shape(10));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5))(0) == nd::make_index(5, 0));
+    REQUIRE((A | nd::freeze_axis(0).at_index(5))(5) == nd::make_index(5, 5));
+    REQUIRE((A | nd::freeze_axis(1).at_index(5))(0) == nd::make_index(0, 5));
+    REQUIRE((A | nd::freeze_axis(1).at_index(5))(5) == nd::make_index(5, 5));
+}
 
 TEST_CASE("binary operation works as expected")
 {
@@ -640,13 +671,13 @@ TEST_CASE("can get an index array using where, and pass that to read_indexes", "
     REQUIRE(bool(((A | nd::read_indexes(nd::where(A < 5))) < 5) | nd::all()));
 }
 
-// TEST_CASE("can get the sum of a 3D array on each axis", "[collect]")
-// {
-//     auto A = nd::ones(10, 20, 30);
-//     REQUIRE((A | nd::collect(nd::sum()).along_axis(0) | nd::read_index(0, 0)) == 10);
-//     REQUIRE((A | nd::collect(nd::sum()).along_axis(1) | nd::read_index(0, 0)) == 20);
-//     REQUIRE((A | nd::collect(nd::sum()).along_axis(2) | nd::read_index(0, 0)) == 30);
-// }
+TEST_CASE("can get the sum of a 3D array on each axis", "[collect]")
+{
+    auto A = nd::ones(10, 20, 30);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(0) | nd::read_index(0, 0)) == 10);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(1) | nd::read_index(0, 0)) == 20);
+    REQUIRE((A | nd::collect(nd::sum()).along_axis(2) | nd::read_index(0, 0)) == 30);
+}
 
 TEST_CASE("can concat two 3d arrays on compatible axes", "[collect]")
 {

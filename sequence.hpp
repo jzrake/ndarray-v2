@@ -27,7 +27,6 @@
 
 
 #pragma once
-#include <algorithm>  // std::find
 #include <functional> // std::plus, std::multiplies
 #include <stdexcept>  // std::out_of_range
 #include <tuple>      // std::tuple
@@ -133,6 +132,11 @@ namespace sq
 
     template<typename ValueType, typename Predicate, std::size_t Rank>
     auto any_of(const sequence_t<ValueType, Rank>& seq, Predicate pred);
+
+    template<typename ValueType, std::size_t Rank>
+    auto contains(const sequence_t<ValueType, Rank>& seq, ValueType value);
+    template<typename ValueType>
+    auto contains(ValueType value);
 
     template<typename ValueType, std::size_t Rank, std::size_t NumIndexes>
     auto read_indexes(const sequence_t<ValueType, Rank>& seq, const sequence_t<std::size_t, NumIndexes>& indexes);
@@ -764,7 +768,7 @@ auto sq::product() { return [] (auto&& seq) { return product(seq); }; }
  *
  * @tparam     ValueType  The value type
  * @tparam     Predicate  The type of the predicate function
- * @tparam     Rank       The rank of the starting sequence
+ * @tparam     Rank       The rank of the sequence
  *
  * @return     A boolean
  */
@@ -789,7 +793,7 @@ auto sq::all_of(const sequence_t<ValueType, Rank>& seq, Predicate pred)
  *
  * @tparam     ValueType  The value type
  * @tparam     Predicate  The type of the predicate function
- * @tparam     Rank       The rank of the starting sequence
+ * @tparam     Rank       The rank of the sequence
  *
  * @return     A boolean
  */
@@ -806,13 +810,36 @@ auto sq::any_of(const sequence_t<ValueType, Rank>& seq, Predicate pred)
 
 
 /**
+ * @brief      Return true of any of the sequence's elements are equal to the
+ *             given value.
+ *
+ * @param[in]  seq        The sequence that might contain the value
+ * @param[in]  value      The value to check for
+ *
+ * @tparam     ValueType  The sequence value type
+ * @tparam     Rank       The sequence rank
+ *
+ * @return     A boolean
+ */
+template<typename ValueType, std::size_t Rank>
+auto sq::contains(const sequence_t<ValueType, Rank>& seq, ValueType value)
+{
+    return sq::any_of(seq, [value] (auto s) { return s == value; });
+}
+template<typename ValueType>
+auto sq::contains(ValueType value) { return [value] (auto&& seq) { return contains(seq, value); }; }
+
+
+
+
+/**
  * @brief      Read indexes from a sequence.
  *
  * @param[in]  seq         The sequence to read from
  * @param[in]  indexes     The indexes to read
  *
  * @tparam     ValueType   The value type
- * @tparam     Rank        The rank of the starting sequence
+ * @tparam     Rank        The rank of the sequence
  * @tparam     NumIndexes  The number of indexes to read
  *
  * @return     A new sequence
@@ -865,13 +892,13 @@ auto sq::insert_elements(
 
     for (std::size_t n = 0; n < result.size(); ++n)
     {
-        if (std::find(std::begin(indexes), std::end(indexes), n) == std::end(indexes))
+        if (indexes | contains(n))
         {
-            result[n] = source[source1_n++];
+            result[n] = values[source2_n++];
         }
         else
         {
-            result[n] = values[source2_n++];
+            result[n] = source[source1_n++];
         }
     }
 
@@ -911,7 +938,7 @@ auto sq::remove_indexes(
 
     for (std::size_t n = 0; n < source.size(); ++n)
     {
-        if (std::find(std::begin(indexes), std::end(indexes), n) == std::end(indexes))
+        if (! contains(indexes, n))
         {
             result[target_n++] = source[n];
         }
