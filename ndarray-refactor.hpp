@@ -1839,9 +1839,7 @@ public:
         {
             return array(index.insert(index_to_freeze_at.seq, axes_to_freeze.seq));
         };
-        auto shape = array.shape().remove(axes_to_freeze.seq);
-
-        return make_array(mapping, shape);
+        return make_array(mapping, array.shape().remove(axes_to_freeze.seq));
     }
 
     auto at_index(index_t<RankDifference> new_index_to_freeze_at) const
@@ -1887,12 +1885,10 @@ public:
         auto mapping = [the_operator=the_operator, axis_to_reduce=axis_to_reduce, array] (auto index)
         {
             auto axes_to_freeze = sq::range_sequence<array.rank()>() | sq::erase(axis_to_reduce);
-            auto freezer = axis_freezer_t<array.rank() - 1>(axes_to_freeze).at_index(index.select(axes_to_freeze));
+            auto freezer = axis_freezer_t<array.rank() - 1>(axes_to_freeze).at_index(index);
             return the_operator(freezer(array));
         };
-        auto shape = array.shape().remove(sq::make_sequence(axis_to_reduce));
-
-        return make_array(mapping, shape);
+        return make_array(mapping, array.shape().remove(axis_to_reduce));
     }
 
     auto along_axis(std::size_t new_axis_to_reduce) const

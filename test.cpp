@@ -1,4 +1,3 @@
-#include "ndarray.hpp"
 #include "sequence.hpp"
 #include "catch.hpp"
 #include "ndarray-refactor.hpp"
@@ -714,12 +713,10 @@ TEST_CASE("can get an index array using where, and pass that to read_indexes", "
 
 TEST_CASE("can get the sum of a 3D array on each axis", "[collect]")
 {
-    // PROBLEM HERE:
-
-    // auto A = nd::ones(10, 20, 30);
-    // REQUIRE((A | nd::collect(nd::sum()).along_axis(0) | nd::read_index(0, 0)) == 10);
-    // REQUIRE((A | nd2::collect(nd2::sum()).along_axis(1) | nd2::read_index(0, 0)) == 20);
-    // REQUIRE((A | nd2::collect(nd2::sum()).along_axis(2) | nd2::read_index(0, 0)) == 30);
+    auto A = nd2::ones(10, 20, 30);
+    REQUIRE((A | nd2::collect(nd2::sum()).along_axis(0) | nd2::read_index(0, 0)) == 10);
+    REQUIRE((A | nd2::collect(nd2::sum()).along_axis(1) | nd2::read_index(0, 0)) == 20);
+    REQUIRE((A | nd2::collect(nd2::sum()).along_axis(2) | nd2::read_index(0, 0)) == 30);
 }
 
 // TEST_CASE("can concat two 3d arrays on compatible axes", "[collect]")
