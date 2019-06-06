@@ -53,8 +53,8 @@ namespace nd
     template<std::size_t Rank>                                           class memory_strides_t;
     template<std::size_t Rank>                                           class access_pattern_t;
     template<typename ValueType, std::size_t Rank>                       class basic_sequence_t;
-    template<typename Provider>                                          class array_t;
     template<typename ValueType>                                         class buffer_t;
+    template<typename Provider>                                          class array_t;
 
 
     // array and access pattern factory functions
@@ -156,9 +156,9 @@ namespace nd
     template<typename... Args>                     auto replace_from(Args... args);
     template<std::size_t Rank>                     auto reshape(shape_t<Rank> shape);
     template<typename... Args>                     auto reshape(Args... args);
-    template<typename ArrayType>                   auto read_indexes(ArrayType array_of_indexes);
     template<std::size_t Rank>                     auto read_index(index_t<Rank>);
     template<typename... Args>                     auto read_index(Args... args);
+    template<typename ArrayType>                   auto read_indexes(ArrayType array_of_indexes);
 
 
     // to_string overloads
@@ -175,18 +175,10 @@ namespace nd
     template<typename ArrayType> using value_type_of = typename std::remove_reference_t<ArrayType>::value_type;
 
 
-    // to_string overloads
-    //=========================================================================
-    template<std::size_t Rank> auto to_string(const index_t<Rank>& index);
-    template<std::size_t Rank> auto to_string(const shape_t<Rank>& index);
-    template<std::size_t Rank> auto to_string(const access_pattern_t<Rank>& region);
-
-
     // algorithm support structs
     //=========================================================================
     template<typename ValueType>                          class range_container_t;
     template<typename ValueType, typename ContainerTuple> class zipped_container_t;
-    template<typename ContainerType, typename Function>   class transformed_container_t;
 
 
     // std::algorithm wrappers for ranges, and some extras
@@ -197,7 +189,6 @@ namespace nd
     template<typename Range>                                   auto distance(Range&& rng);
     template<typename Range>                                   auto enumerate(Range&& rng);
     template<typename ValueType>                               auto range(ValueType count);
-    template<typename Function>                                auto transform(Function fn);
     template<typename... ContainerTypes>                       auto zip(ContainerTypes&&... containers);
 
 
@@ -310,7 +301,7 @@ public:
         }
         bool operator==(const iterator& other) const { return iterators == other.iterators; }
         bool operator!=(const iterator& other) const { return iterators != other.iterators; }
-        auto operator*() const { return detail::transform_tuple([] (const auto& x) { return std::ref(*x); }, iterators); }
+        decltype(auto) operator*() const { return detail::transform_tuple([] (const auto& x) { return *x; }, iterators); }
 
         IteratorTuple iterators;
     };
@@ -334,50 +325,6 @@ public:
 private:
     //=========================================================================
     ContainerTuple containers;
-};
-
-
-
-
-//=============================================================================
-template<typename ContainerType, typename Function>
-class nd::transformed_container_t
-{
-public:
-    using value_type = std::invoke_result_t<Function, typename ContainerType::value_type>;
-
-    //=========================================================================
-    template<typename IteratorType>
-    struct iterator
-    {
-        using iterator_category = std::input_iterator_tag;
-        using value_type = transformed_container_t::value_type;
-        using difference_type = std::ptrdiff_t;
-        using pointer = value_type*;
-        using reference = value_type&;
-
-        iterator& operator++() { ++current; return *this; }
-        bool operator==(const iterator& other) const { return current == other.current; }
-        bool operator!=(const iterator& other) const { return current != other.current; }
-        auto operator*() const { return function(*current); }
-
-        IteratorType current;
-        const Function& function;
-    };
-
-    //=========================================================================
-    transformed_container_t(ContainerType container, Function function)
-    : container(container)
-    , function(function) {}
-
-    auto size() const { return container.size(); }
-    auto begin() const { return iterator<decltype(container.begin())> {container.begin(), function}; }
-    auto end() const { return iterator<decltype(container.end())> {container.end(), function}; }
-
-private:
-    //=========================================================================
-    ContainerType container;
-    Function function;
 };
 
 
@@ -426,15 +373,6 @@ auto nd::zip(ContainerTypes&&... containers)
     using ValueType = std::tuple<typename std::remove_reference_t<ContainerTypes>::value_type...>;
     using ContainerTuple = std::tuple<ContainerTypes...>;
     return nd::zipped_container_t<ValueType, ContainerTuple>(std::forward_as_tuple(containers...));
-}
-
-template<typename Function>
-auto nd::transform(Function fn)
-{
-    return [fn] (auto container)
-    {
-        return transformed_container_t<decltype(container), Function>(container, fn);
-    };
 }
 
 
@@ -636,8 +574,13 @@ public:
 
     std::size_t compute_offset(const index_t<Rank>& index) const
     {
-        auto mul_tuple = [] (auto t) { return std::get<0>(t) * std::get<1>(t); };
-        return accumulate(zip(index, *this) | transform(mul_tuple), 0, std::plus<>());
+        std::size_t result = 0;
+   
+        for (std::size_t i = 0; i < Rank; ++i)
+        {
+            result += index[i] * this->operator[](i);
+        }
+        return result;
     }
 
     template<typename... Args>
@@ -646,6 +589,7 @@ public:
         return compute_offset(make_index(args...));
     }
 };
+
 
 
 
@@ -988,6 +932,20 @@ auto nd::make_access_pattern(Args... args)
     return access_pattern_t<sizeof...(Args)>().with_final(args...);
 }
 
+
+
+
+/**
+ * @brief      Return a sequence of access patterns that cover a shape by
+ *             partitioning it on its first axis.
+ *
+ * @param[in]  shape          The shape to partition
+ *
+ * @tparam     NumPartitions  The number of partitions
+ * @tparam     Rank           The shape rank
+ *
+ * @return     A sequence of access patterns
+ */
 template<std::size_t NumPartitions, std::size_t Rank>
 auto nd::partition_shape(shape_t<Rank> shape)
 {
