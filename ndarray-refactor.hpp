@@ -129,6 +129,12 @@ namespace nd::detail
 
     template <typename T>
     struct has_typedef_is_ndarray<T, std::void_t<typename T::is_ndarray>> : std::true_type {};
+
+template<std::size_t Index, typename ArrayType>
+static auto get_through(ArrayType array)
+{
+    return make_array([array] (auto index) { return std::get<Index>(array(index)); }, array.shape());
+};
 }
 
 
@@ -524,7 +530,7 @@ public:
     struct iterator
     {
         using iterator_category = std::input_iterator_tag;
-        using value_type = value_type;
+        using value_type = typename Provider::value_type;
         using difference_type = std::ptrdiff_t;
         using pointer = value_type*;
         using reference = value_type&;
@@ -1157,13 +1163,9 @@ auto nd::enumerate(ArrayType array)
 template<typename ArrayType>
 auto nd::unzip(ArrayType array)
 {
-    auto get_through = [array] (auto i)
+    return sq::detail::index_apply<std::tuple_size<typename ArrayType::value_type>::value>([array] (auto... is)
     {
-        return make_array([i, array] (auto index) { return std::get<i>(array(index)); }, array.shape());
-    };
-    return sq::detail::index_apply<std::tuple_size<typename ArrayType::value_type>::value>([get_through, array] (auto... is)
-    {
-        return std::make_tuple(get_through(is)...);
+        return std::make_tuple(detail::get_through<is>(array)...);
     });
 }
 

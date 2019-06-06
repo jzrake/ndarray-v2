@@ -1,11 +1,9 @@
-CXXFLAGS = -std=c++17 -O0 -Wextra -fsanitize=undefined
-# CXXFLAGS = -std=c++17 -O3 -Wextra
+# CXXFLAGS = -std=c++17 -O0 -Wextra -fsanitize=undefined
+CXXFLAGS = -std=c++17 -O0 -Wextra
 
-HEADERS = ndarray.hpp ndarray-refactor.hpp sequence.hpp
+HEADERS = ndarray-refactor.hpp sequence.hpp
 
-default: test main
-
-main.o: $(HEADERS)
+default: test
 
 test.o: $(HEADERS)
 
