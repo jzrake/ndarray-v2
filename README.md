@@ -112,12 +112,12 @@ auto B = nd::ones(10, 10, 5) | nd::concat(nd::zeros(10, 10, 3)).on_axis(2);
 
 Create an array of tuples from arrays of identical shape:
 ```C++
-auto ABC = nd::zip_arrays(A, B, C); // ABC(0, 0) is a std::tuple
+auto ABC = nd::zip(A, B, C); // ABC(0, 0) is a std::tuple
 ```
 
 Create a tuple of arrays from an array of tuples:
 ```C++
-auto [A, B, C] = nd::unzip_arrays(ABC);
+auto [A, B, C] = nd::unzip(ABC);
 ```
 
 Take the cartesian product of a sequence of arrays:
@@ -279,10 +279,3 @@ auto evaluate_on()
 The actual mileage you'll get out of this approach may vary with type of memory access patterns your arrays are using, and what type of calculations are being done. Typically, the more work you do per evaluation of `operator()`, the better. The `partition_shape` function divvies the shape on axis 0, which is appropriate for C-style arrays. If you have written a custom memory-backed provider which instead accesses memory Fortran-style, you should partition the shape on the last axis, since otherwise your threads will contend for cache lines (see [false sharing](https://en.wikipedia.org/wiki/False_sharing)).
 
 Note that reductions are also a parallelizable operation - you could easily adapt this example to write a multi-threaded `reduce_on` operator.
-
-
-## TODO items
-- [ ] Add `array_t::iterator`
-- [x] Add `nd::make_array_from` (iterable)
-- [ ] Write `flat` operator and `from_range` factory
-- [ ] Unify the approach to 1d ranges with the array/provider scheme

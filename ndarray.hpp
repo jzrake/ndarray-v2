@@ -101,10 +101,11 @@ namespace nd
     template<typename ValueType, typename... Args>     auto make_shared_array(Args... args);
     template<typename ValueType, std::size_t Rank>     auto make_unique_array(shape_t<Rank> shape);
     template<typename ValueType, typename... Args>     auto make_unique_array(Args... args);
+    template<std::size_t Index, typename ArrayType>    auto get(ArrayType array);
     template<std::size_t Rank>                         auto index_array(shape_t<Rank> shape);
     template<typename... Args>                         auto index_array(Args... args);
-    template<typename... ArrayTypes>                   auto zip_arrays(ArrayTypes... arrays);
-    template<typename ArrayType>                       auto unzip_array(ArrayType array);
+    template<typename... ArrayTypes>                   auto zip(ArrayTypes... arrays);
+    template<typename ArrayType>                       auto unzip(ArrayType array);
     template<typename... ArrayTypes>                   auto cartesian_product(ArrayTypes... arrays);
     template<typename... ArrayTypes>                   auto meshgrid(ArrayTypes... arrays);
     template<typename ValueType=int, typename... Args> auto zeros(Args... args);
@@ -249,6 +250,16 @@ public:
 
         return result;
     }
+
+    static DerivedType range()
+    {
+        auto result = DerivedType();
+
+        for (std::size_t n = 0; n < Rank; ++n)
+            result[n] = n;
+
+        return result;
+    };
 
     short_sequence_t()
     {
@@ -974,7 +985,7 @@ public:
 
         auto mapping = [the_operator=the_operator, axis_to_reduce=axis_to_reduce, array] (auto&& index)
         {
-            auto axes_to_freeze = range_index<R>().remove_elements(make_index(axis_to_reduce));
+            auto axes_to_freeze = index_t<R>::range().remove_elements(make_index(axis_to_reduce));
             auto freezer = axis_freezer_t<R - 1>(axes_to_freeze).at_index(index);
             return the_operator(freezer(array));
         };
@@ -990,17 +1001,6 @@ public:
 
 private:
     //=========================================================================
-    template<std::size_t Rank>
-    static index_t<Rank> range_index()
-    {
-        auto result = index_t<Rank>();
-
-        for (std::size_t n = 0; n < Rank; ++n)
-            result[n] = n;
-
-        return result;
-    };
-
     std::size_t axis_to_reduce;
     OperatorType the_operator;
 };
@@ -1516,6 +1516,26 @@ auto nd::make_shared_array(Args... args)
 
 
 /**
+ * @brief      Return an array with the i-th tuple index of all the elements
+ *             (maps std::get<Index>) over the array).
+ *
+ * @param[in]  array      The array of std::tuple (or std::array)
+ *
+ * @tparam     Index      The tuple index
+ * @tparam     ArrayType  The type of the array
+ *
+ * @return     The array
+ */
+template<std::size_t Index, typename ArrayType>
+auto nd::get(ArrayType array)
+{
+    return detail::get_through<Index>(array);
+}
+
+
+
+
+/**
  * @brief      Make a unique (mutable, non-copyable, memory-backed) array with
  *             the given shape.
  *
@@ -1576,7 +1596,7 @@ auto nd::index_array(Args... args)
  * @return     An array which returns tuples taken from the underlying arrays
  */
 template<typename... ArrayTypes>
-auto nd::zip_arrays(ArrayTypes... arrays)
+auto nd::zip(ArrayTypes... arrays)
 {
     constexpr std::size_t Ranks[] = {ArrayTypes::array_rank...};
     shape_t<Ranks[0]> shapes[] = {arrays.shape()...};
@@ -1605,7 +1625,7 @@ auto nd::zip_arrays(ArrayTypes... arrays)
  * @return     The tuple of arrays
  */
 template<typename ArrayType>
-auto nd::unzip_array(ArrayType array)
+auto nd::unzip(ArrayType array)
 {
     auto Is = std::make_index_sequence<std::tuple_size<typename ArrayType::value_type>::value>();
     return detail::unzip_array_impl(array, Is);
@@ -1651,7 +1671,7 @@ auto nd::cartesian_product(ArrayTypes... arrays)
 template<typename... ArrayTypes>
 auto nd::meshgrid(ArrayTypes... arrays)
 {
-    return unzip_array(cartesian_product(arrays...));
+    return unzip(cartesian_product(arrays...));
 }
 
 
@@ -2149,7 +2169,7 @@ auto nd::select(access_pattern_t<Rank> region_to_select)
 
 auto nd::select_axis(std::size_t axis_to_select)
 {
-    return axis_selector_t(axis_to_select, 0, 0, false);
+    return axis_selector_t(axis_to_select, 0, 0, 1, false);
 }
 
 
@@ -2413,7 +2433,8 @@ public:
     template<typename T> auto operator>=(T&& A) const { return bin_op(std::forward<T>(A), std::greater_equal<>()); }
     template<typename T> auto operator<(T&& A) const { return bin_op(std::forward<T>(A), std::less<>()); }
     template<typename T> auto operator>(T&& A) const { return bin_op(std::forward<T>(A), std::greater<>()); }
-    auto operator-() const { return *this | map(std::negate<>()); }
+    auto operator+() const { return *this | map([] (auto&& x) { return +x; }); }
+    auto operator-() const { return *this | map([] (auto&& x) { return -x; }); }
     auto operator!() const { return *this | map(std::logical_not<>()); }
 
 
@@ -2544,7 +2565,7 @@ auto nd::divvy(std::size_t num_groups)
 
 
 template<std::size_t Rank>
-auto nd::to_string(const nd::index_t<Rank>& index)
+auto nd::to_string(const index_t<Rank>& index)
 {
     auto result = std::string("[ ");
 
@@ -2556,7 +2577,7 @@ auto nd::to_string(const nd::index_t<Rank>& index)
 }
 
 template<std::size_t Rank>
-auto nd::to_string(const nd::shape_t<Rank>& index)
+auto nd::to_string(const shape_t<Rank>& index)
 {
     auto result = std::string("< ");
 
@@ -2568,7 +2589,7 @@ auto nd::to_string(const nd::shape_t<Rank>& index)
 }
 
 template<std::size_t Rank>
-auto nd::to_string(const nd::access_pattern_t<Rank>& region)
+auto nd::to_string(const access_pattern_t<Rank>& region)
 {
     return to_string(region.start) + " -> " + to_string(region.final);
 }
