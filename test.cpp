@@ -31,11 +31,6 @@ TEST_CASE("shapes support insertion and removal of elements")
     REQUIRE(shape.insert_elements(nd::make_index(3, 4), nd::make_shape(8, 9)) == nd::make_shape(0, 1, 2, 8, 9));
 }
 
-// TEST_CASE("range can be constructed", "[distance] [enumerate] [range]")
-// {
-//     REQUIRE(nd::distance(nd::enumerate(nd::range(10))) == 10);
-// }
-
 TEST_CASE("buffer works as expected", "[buffer]")
 {
     SECTION("can instantiate an empty buffer")
@@ -209,11 +204,11 @@ TEST_CASE("shared buffer provider can be constructed", "[array] [shared_provider
     }
 }
 
-TEST_CASE("can zip arrays together", "[zip_arrays]")
+TEST_CASE("can zip arrays together", "[zip]")
 {
     auto A = nd::make_shared_array<double>(10, 10);
     auto B = nd::make_shared_array<int>(10, 10);
-    auto AB = nd::zip_arrays(A, B);
+    auto AB = nd::zip(A, B);
     REQUIRE(AB(0, 0) == std::make_tuple(0.0, 0));
 }
 
@@ -401,6 +396,10 @@ TEST_CASE("select_axis operator works as expected", "[select_axis]")
     REQUIRE((A | nd::select_axis(1).from(2).to(8)).shape() == nd::make_shape(10, 6));
     REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end()).shape() == nd::make_shape(6, 10));
     REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end()).shape() == nd::make_shape(10, 6));
+
+    REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end().jumping(2)).shape() == nd::make_shape(10, 3));
+    REQUIRE((A | nd::select_axis(1).from(0).to(1).from_the_end().jumping(2)).shape() == nd::make_shape(10, 5));
+    REQUIRE((A | nd::select_axis(1).from(1).to(0).from_the_end().jumping(2)).shape() == nd::make_shape(10, 5));
 
     REQUIRE((A | nd::select_axis(0).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(2, 0));
     REQUIRE((A | nd::select_axis(1).from(2).to(2).from_the_end() | nd::read_index(0, 0)) == nd::make_index(0, 2));

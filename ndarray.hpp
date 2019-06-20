@@ -531,7 +531,7 @@ public:
 
         for (std::size_t n = 0; n < Rank; ++n)
         {
-            s[n] = final[n] / jumps[n] - start[n] / jumps[n];
+            s[n] = (final[n] - start[n] - 1) / jumps[n] + 1;
         }
         return s;
     }
@@ -820,10 +820,11 @@ class nd::axis_selector_t
 public:
 
     //=========================================================================
-    axis_selector_t(std::size_t axis_to_select, std::size_t start, std::size_t final, bool is_final_from_the_end)
+    axis_selector_t(std::size_t axis_to_select, std::size_t start, std::size_t final, std::size_t jumps, bool is_final_from_the_end)
     : axis_to_select(axis_to_select)
     , start(start)
     , final(final)
+    , jumps(jumps)
     , is_final_from_the_end(is_final_from_the_end) {}
 
     template<typename ArrayType>
@@ -833,29 +834,34 @@ public:
         {
             throw std::logic_error("cannot select axis greater than or equal to array rank");
         }
-        auto mapping = [axis_to_select=axis_to_select, start=start, array] (auto index)
+
+        auto accessor = make_access_pattern(array.shape());
+        accessor.start[axis_to_select] = start;
+        accessor.final[axis_to_select] = is_final_from_the_end ? array.shape(axis_to_select) - final : final;
+        accessor.jumps[axis_to_select] = jumps;
+
+        auto mapping = [accessor, array] (auto index)
         {
-            index[axis_to_select] += start;
-            return array(index);
+            return array(accessor.map_index(index));
         };
-
-        auto shape = array.shape();
-        shape[axis_to_select] -= start + (is_final_from_the_end ? final : (shape[axis_to_select] - final));
-
-        return make_array(mapping, shape);
+        return make_array(mapping, accessor.shape());
     }
 
     auto from(std::size_t new_start) const
     {
-        return axis_selector_t(axis_to_select, new_start, final, is_final_from_the_end);
+        return axis_selector_t(axis_to_select, new_start, final, jumps, is_final_from_the_end);
     }
     auto to(std::size_t new_final) const
     {
-        return axis_selector_t(axis_to_select, start, new_final, is_final_from_the_end);
+        return axis_selector_t(axis_to_select, start, new_final, jumps, is_final_from_the_end);
+    }
+    auto jumping(std::size_t new_jumps) const
+    {
+        return axis_selector_t(axis_to_select, start, final, new_jumps, is_final_from_the_end);
     }
     auto from_the_end() const
     {
-        return axis_selector_t(axis_to_select, start, final, true);
+        return axis_selector_t(axis_to_select, start, final, jumps, true);
     }
 
 private:
@@ -863,6 +869,7 @@ private:
     std::size_t axis_to_select;
     std::size_t start;
     std::size_t final;
+    std::size_t jumps;
     bool is_final_from_the_end;
 };
 
