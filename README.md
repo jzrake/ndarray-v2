@@ -5,7 +5,7 @@ _Header-only implementation of an N-dimensional array for modern C++_
 ## Overview
 This library adopts an abstract notion of an array: an array is something that defines an N-dimensional index space (a _shape_), and a mapping from that space to values,
 
-    `arrays := (shape, index => value)`
+    `array := (shape, index => value)`
 
 The mapped values may be generated however you want - either by looking them up in a memory buffer (as in a conventional array), or by calling a function with the index as a parameter.
 
